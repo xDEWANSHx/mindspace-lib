@@ -1,0 +1,901 @@
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Anybody:wght@700;800;900&amp;family=Manrope:wght@300;400;700&amp;family=Space+Mono:wght@700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <style>
+        @layer base {
+
+            html,
+            body {
+                margin: 0;
+                padding: 0;
+                background-color: #FDFBF7;
+            }
+
+            body {
+                overscroll-behavior: none;
+            }
+
+            main> :first-child {
+                margin-top: 0 !important;
+            }
+
+            main> :last-child {
+                margin-bottom: 0 !important;
+            }
+        }
+
+        ::-webkit-scrollbar {
+            display: none;
+        }
+
+        .paper-texture {
+            background-image: url("https://www.transparenttextures.com/patterns/p6.png");
+        }
+
+        .wood-stroke {
+            border: 1px solid #D4B28C;
+            box-shadow: inset 0 0 4px rgba(212, 178, 140, 0.2);
+        }
+
+        .cyan-glow {
+            box-shadow: 0 0 20px rgba(0, 168, 204, 0.15);
+        }
+
+        .espresso-finish {
+            background: linear-gradient(rgba(42, 24, 1, 0.95), rgba(42, 24, 1, 0.95)), url("https://www.transparenttextures.com/patterns/wood-pattern.png");
+            background-color: #2A1801;
+        }
+
+        .marquee-container {
+            display: flex;
+            overflow: hidden;
+            user-select: none;
+            gap: 2rem;
+        }
+
+        .marquee-content {
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-around;
+            min-width: 100%;
+            gap: 2rem;
+            animation: scroll 40s linear infinite;
+        }
+
+        @keyframes scroll {
+            from {
+                transform: translateX(0);
+            }
+
+            to {
+                transform: translateX(calc(-100% - 2rem));
+            }
+        }
+
+        .divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #c6c7c0 50%, transparent);
+            opacity: 0.3;
+        }
+    </style>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "background": "#f3fbf6",
+                        "surface-container": "#e7f0eb",
+                        "tertiary-fixed-dim": "#58d5fb",
+                        "on-tertiary-container": "#007e9a",
+                        "tertiary-container": "#f7fcff",
+                        "surface-dim": "#d3dcd7",
+                        "secondary-container": "#fed9b1",
+                        "primary-fixed-dim": "#c8c6c3",
+                        "surface-variant": "#dce5df",
+                        "outline-variant": "#c6c7c0",
+                        "primary": "#5e5e5c",
+                        "secondary": "#745a3a",
+                        "secondary-fixed-dim": "#e4c19a",
+                        "inverse-primary": "#c8c6c3",
+                        "ink-charcoal": "#1C2421",
+                        "surface-tint": "#5e5e5c",
+                        "inverse-surface": "#2a322f",
+                        "on-surface": "#151d1a",
+                        "on-secondary-fixed-variant": "#5a4224",
+                        "on-secondary-fixed": "#2a1801",
+                        "on-tertiary-fixed": "#001f28",
+                        "secondary-fixed": "#ffddb8",
+                        "error": "#ba1a1a",
+                        "alabaster-surface": "#FDFBF7",
+                        "inverse-on-surface": "#eaf3ee",
+                        "tertiary": "#00677e",
+                        "electric-cyan": "#00A8CC",
+                        "surface-container-low": "#edf6f0",
+                        "birch-accent": "#D4B28C",
+                        "on-primary-container": "#747471",
+                        "error-container": "#ffdad6",
+                        "surface-container-high": "#e2eae5",
+                        "on-background": "#151d1a",
+                        "on-secondary-container": "#795e3e",
+                        "outline": "#767872",
+                        "on-error-container": "#93000a",
+                        "primary-fixed": "#e4e2de",
+                        "tertiary-fixed": "#b5ebff",
+                        "on-primary": "#ffffff",
+                        "on-surface-variant": "#454742",
+                        "primary-container": "#fdfbf7",
+                        "on-error": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed": "#1b1c1a",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-fixed-variant": "#004e60",
+                        "surface-bright": "#f3fbf6",
+                        "surface": "#f3fbf6",
+                        "surface-container-highest": "#dce5df",
+                        "on-secondary": "#ffffff",
+                        "on-primary-fixed-variant": "#474744"
+                    },
+                    borderRadius: { DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px" },
+                    spacing: { "container-max": "1440px", unit: "8px", gutter: "32px", "margin-edge": "64px", "bento-gap": "16px" },
+                    fontFamily: {
+                        "body-md": ["manrope"],
+                        "headline-lg": ["anybody"],
+                        "display-xl": ["anybody"],
+                        "headline-lg-mobile": ["anybody"],
+                        "body-lg": ["manrope"],
+                        "quote-editorial": ["manrope"],
+                        "headline-md": ["anybody"],
+                        "label-caps": ["spaceMono"]
+                    },
+                    fontSize: {
+                        "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+                        "headline-lg": ["64px", { lineHeight: "72px", letterSpacing: "-0.02em", fontWeight: "800" }],
+                        "display-xl": ["120px", { lineHeight: "110px", letterSpacing: "-0.04em", fontWeight: "900" }],
+                        "headline-lg-mobile": ["40px", { lineHeight: "44px", letterSpacing: "-0.02em", fontWeight: "800" }],
+                        "body-lg": ["20px", { lineHeight: "32px", fontWeight: "400" }],
+                        "quote-editorial": ["28px", { lineHeight: "40px", fontWeight: "300" }],
+                        "headline-md": ["32px", { lineHeight: "40px", fontWeight: "700" }],
+                        "label-caps": ["12px", { lineHeight: "16px", letterSpacing: "0.1em", fontWeight: "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="bg-alabaster-surface font-body-md text-on-surface paper-texture min-h-screen">
+    <header class="fixed top-6 left-0 right-0 z-50 px-margin-edge">
+        <nav
+            class="max-w-container-max mx-auto h-20 bg-alabaster-surface/40 backdrop-blur-2xl rounded-xl wood-stroke flex items-center justify-between px-gutter shadow-[0_8px_32px_rgba(0,0,0,0.02)]">
+            <div class="flex items-center gap-4">
+                <img alt="MindSpace Library Logo" class="h-10 w-auto object-contain"
+                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1l_IH7heHOr3bENDnQaBBt39_h9zVc2HAmjfGDlbYd_N3qiA3sk4R7fANJaKNXgX2XzOHLFCtu4TZjTjJbUrL3cd_4DcWcpAeIfUDZk8J4Y5hjJlkW-KzptHZkE0rW2bCrCgM_Bf7tD5TTcXfiXnTIZHgZmGhn62QagOELNX7m3Y65_Y_MAbNxAy6VIUjeVGotgn2wUXKf1Vwr_2hGyjwkNlFxMT0IZDTNgKrw-_CBnx3GkmhOR2NuJzzGbSF2ExI6snfLbqS6FdT" />
+                <span class="font-headline-md text-body-lg tracking-tight text-ink-charcoal">MindSpace</span>
+            </div>
+            <div class="hidden lg:flex items-center gap-8">
+                <a class="text-label-caps text-on-surface-variant hover:text-electric-cyan transition-all"
+                    href="#">Sanctuary</a>
+                <a class="text-label-caps text-on-surface-variant hover:text-electric-cyan transition-all"
+                    href="#">Membership</a>
+                <a class="text-label-caps text-on-surface-variant hover:text-electric-cyan transition-all"
+                    href="#">Management</a>
+                <a class="text-label-caps text-on-surface-variant hover:text-electric-cyan transition-all"
+                    href="#">Founder</a>
+            </div>
+            <div class="flex items-center gap-6">
+                <button
+                    class="bg-electric-cyan text-on-primary font-label-caps px-6 py-3 rounded-full hover:brightness-110 transition-all shadow-md cyan-glow">Join
+                    Sanctuary</button>
+                <div class="relative group cursor-pointer">
+                    <img alt="Profile" class="w-10 h-10 rounded-full object-cover wood-stroke"
+                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuCcw4RrNvLYxMuBaeGTWHgcz2RNS642pAwam5tSdxxHvn_OXqdx3ke5EDXYUgHLo-ItvP7yjjzs2sq5iiLJCw5idM6qk0aIiaq_yiJddz1DSaCIYp_R4q99KxEWHQifuwUlKtlcTE_q0MXZcCmcxA15lrGRfVDgPF6GDrQWLQxiGqtqduhMTMJiSB-ku6zzjnsDwWYSqGWjaju_qBw29OJFqcxYVDcHVyHbZhJV5C8M7-hGb-poBO8-c2rgWSGncr2dEh8DuCu77eTC" />
+                    <div
+                        class="absolute right-0 top-full mt-4 bg-alabaster-surface wood-stroke p-4 rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all w-48 z-50">
+                        <p class="text-label-caps text-on-surface mb-1">Harsh Goyal</p>
+                        <p class="text-[10px] text-outline uppercase tracking-widest">Founder's Portal</p>
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </header>
+    <main class="pt-20">
+        <!-- New Professional Hero Section -->
+        <section class="relative w-full h-[85vh] min-h-[700px] flex items-center overflow-hidden">
+            <div class="absolute inset-0 z-0">
+                <img alt="Premium Study Sanctuary" class="w-full h-full object-cover"
+                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuC6_g3BIe_-nA0i2c_jPknM5m8QwFTvgSG34rtjI6Bq5VrNMOIuHbm5iaq5qdD4BBYXSJGnGvTBh9QLEWERyJ92gcGBr7zwhlhIGi5zr5uYPcq3wE3tki8wMfS5BShysQjI2oSnS06Tg-3xSI_qEsSSKkYuQ22ZA5EtnTS85bkvxOMlVOeMIGi3Td2J2zzcV2eVsyz-R49oxMljq2-Li7coluxfNNW2ig2sI522v35I6s6HYRyMCYW07Mn4YzR9Hv_luDz0wXHC3r0h" />
+                <div
+                    class="absolute inset-0 bg-gradient-to-r from-alabaster-surface via-alabaster-surface/80 to-transparent">
+                </div>
+            </div>
+            <div class="relative z-10 max-w-container-max mx-auto px-margin-edge w-full">
+                <div class="max-w-2xl space-y-8">
+                    <div
+                        class="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-birch-accent/10 backdrop-blur-md border border-electric-cyan/20">
+                        <span class="material-symbols-outlined text-electric-cyan scale-75"
+                            style="font-variation-settings: 'FILL' 1;">verified_user</span>
+                        <span class="font-label-caps text-on-secondary-fixed-variant tracking-widest">Ambikapur's
+                            Premier Sanctuary</span>
+                    </div>
+                    <h1 class="font-headline-lg text-headline-lg text-ink-charcoal leading-tight">
+                        Elevate Your Focus in the <br />
+                        <span class="text-electric-cyan">Heart of Ambikapur.</span>
+                    </h1>
+                    <p class="font-body-lg text-on-surface-variant max-w-lg">
+                        A premium Study Sanctuary designed for deep work and academic excellence. Reimagining the
+                        library experience for the modern scholar.
+                    </p>
+                    <div class="flex items-center gap-6 pt-4">
+                        <button
+                            class="px-10 py-5 bg-ink-charcoal text-alabaster-surface rounded-full font-label-caps text-body-md tracking-widest hover:scale-105 transition-all shadow-xl hover:bg-electric-cyan">
+                            Experience Silence
+                        </button>
+                        <a class="flex items-center gap-2 font-label-caps text-electric-cyan group" href="#tour">
+                            Take a virtual tour
+                            <span
+                                class="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <div class="divider"></div>
+        <!-- Re-styled Stats Counter -->
+        <section class="bg-alabaster-surface py-20">
+            <div class="max-w-container-max mx-auto px-margin-edge">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                    <div
+                        class="bg-surface-container-lowest p-8 rounded-2xl border border-outline-variant/30 text-center hover:border-electric-cyan/50 transition-all shadow-sm group">
+                        <div class="text-electric-cyan mb-4"><span
+                                class="material-symbols-outlined text-4xl">airline_seat_individual_suite</span></div>
+                        <div class="font-headline-md text-ink-charcoal text-4xl mb-1"><span class="counter"
+                                data-target="120">0</span>+</div>
+                        <p class="font-label-caps text-outline text-[10px] uppercase tracking-widest">Ergonomic Seats
+                        </p>
+                    </div>
+                    <div
+                        class="bg-surface-container-lowest p-8 rounded-2xl border border-outline-variant/30 text-center hover:border-electric-cyan/50 transition-all shadow-sm group">
+                        <div class="text-electric-cyan mb-4"><span
+                                class="material-symbols-outlined text-4xl">groups</span></div>
+                        <div class="font-headline-md text-ink-charcoal text-4xl mb-1"><span class="counter"
+                                data-target="5000">0</span>+</div>
+                        <p class="font-label-caps text-outline text-[10px] uppercase tracking-widest">Students Served
+                        </p>
+                    </div>
+                    <div
+                        class="bg-surface-container-lowest p-8 rounded-2xl border border-outline-variant/30 text-center hover:border-electric-cyan/50 transition-all shadow-sm group">
+                        <div class="text-electric-cyan mb-4"><span
+                                class="material-symbols-outlined text-4xl">grade</span></div>
+                        <div class="font-headline-md text-ink-charcoal text-4xl mb-1"><span class="counter"
+                                data-decimal="true" data-target="4.9">0</span>/5</div>
+                        <p class="font-label-caps text-outline text-[10px] uppercase tracking-widest">Google Rating</p>
+                    </div>
+                    <div
+                        class="bg-surface-container-lowest p-8 rounded-2xl border border-outline-variant/30 text-center hover:border-electric-cyan/50 transition-all shadow-sm group">
+                        <div class="text-electric-cyan mb-4"><span
+                                class="material-symbols-outlined text-4xl">wifi_tethering</span></div>
+                        <div class="font-headline-md text-ink-charcoal text-4xl mb-1"><span class="counter"
+                                data-target="300">0</span> Mbps</div>
+                        <p class="font-label-caps text-outline text-[10px] uppercase tracking-widest">Dedicated Wi-Fi
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <div class="divider"></div>
+        <!-- Bento Grid Section -->
+        <section class="w-full bg-alabaster-surface py-24 px-margin-edge">
+            <div class="max-w-container-max mx-auto">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-bento-gap">
+                    <div
+                        class="md:col-span-8 h-[500px] rounded-[48px] overflow-hidden relative wood-stroke shadow-lg group">
+                        <div class="absolute inset-0 bg-cover bg-center transition-transform duration-1000 group-hover:scale-110"
+                            style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBNd1H6uxwRjQaB8Hpdq4TNQQXoWjRk1aEJxkvp7x0nP7GabC9JJ9KryLllZthIk3uR_f66yjGO2XYwOc8RgR_N4LGnH8lX5UA6_4rIlT1gnqaDiKfS6PddldEPKXggjA6-UgHuXn2ftvLbbFhYo7CIcQE_vCQ2J9rPTNVKuV8sOFDhFHcWC8btjp76fHEYj5tv3dOIzcfyqAADNIhT_DfTl3SFHCzwD0qLynWsfzKV_QQD-0OsQ_OW-nY1j4hgjCjRcdx7xldtiq81')">
+                        </div>
+                        <div
+                            class="absolute inset-0 bg-gradient-to-t from-ink-charcoal/80 via-transparent to-transparent">
+                        </div>
+                        <div class="absolute bottom-12 left-12 right-12">
+                            <h3 class="font-headline-md text-alabaster-surface mb-2">Designed for Deep Work</h3>
+                            <p class="font-body-md text-alabaster-surface/70 max-w-md">Eliminating the cognitive load of
+                                noise, so your brain can achieve the 'Flow' state faster.</p>
+                        </div>
+                    </div>
+                    <div class="md:col-span-4 h-[500px] flex flex-col gap-bento-gap">
+                        <div
+                            class="h-1/2 bg-surface-container rounded-[48px] p-10 flex flex-col justify-between wood-stroke group hover:bg-secondary-container transition-colors duration-500">
+                            <div class="flex justify-between items-start">
+                                <span
+                                    class="material-symbols-outlined text-secondary text-4xl">airline_seat_recline_extra</span>
+                                <span
+                                    class="font-label-caps text-secondary text-[10px] tracking-tighter uppercase">Infrastructure</span>
+                            </div>
+                            <div>
+                                <div class="font-headline-lg text-on-secondary-container leading-none">100+</div>
+                                <p class="font-label-caps text-on-secondary-fixed-variant mt-2 uppercase">Ergonomic
+                                    Cabins</p>
+                            </div>
+                        </div>
+                        <div
+                            class="h-1/2 bg-electric-cyan rounded-[48px] p-10 flex flex-col justify-between wood-stroke group hover:bg-ink-charcoal transition-colors duration-500 cyan-glow">
+                            <div class="flex justify-between items-start">
+                                <span class="material-symbols-outlined text-on-primary text-4xl">wifi_password</span>
+                                <span
+                                    class="font-label-caps text-on-primary text-[10px] tracking-tighter uppercase">Connectivity</span>
+                            </div>
+                            <div>
+                                <div class="font-headline-lg text-on-primary leading-none">1 Gbps</div>
+                                <p class="font-label-caps text-on-primary/80 mt-2 uppercase">Dedicated Fiber Optic</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div
+                        class="md:col-span-4 h-[300px] bg-secondary rounded-[48px] p-10 flex flex-col justify-between wood-stroke hover:brightness-105 transition-all">
+                        <div class="flex justify-between items-start">
+                            <span class="material-symbols-outlined text-on-primary text-4xl">auto_stories</span>
+                            <span
+                                class="font-label-caps text-on-primary text-[10px] tracking-tighter uppercase">Resources</span>
+                        </div>
+                        <div>
+                            <div class="font-headline-lg text-on-primary leading-none">5000+</div>
+                            <p class="font-label-caps text-on-primary/80 mt-2 uppercase">Reference Books</p>
+                        </div>
+                    </div>
+                    <div
+                        class="md:col-span-8 h-[300px] bg-on-surface-variant rounded-[48px] p-12 flex items-center gap-12 wood-stroke">
+                        <div
+                            class="hidden lg:block w-32 h-32 rounded-full border border-alabaster-surface/20 flex-shrink-0 flex items-center justify-center p-4">
+                            <span
+                                class="material-symbols-outlined text-electric-cyan text-5xl animate-pulse">volume_off</span>
+                        </div>
+                        <div class="space-y-4">
+                            <span class="font-label-caps text-electric-cyan text-[10px] uppercase">Our Distinctive
+                                Identity</span>
+                            <h3 class="font-headline-md text-alabaster-surface">The Silent Reading Sanctuary</h3>
+                            <p class="font-body-md text-alabaster-surface/60 max-w-xl">
+                                Unlike traditional lending libraries, MindSpace is a dedicated environment for
+                                concentration. No checkout counters, no chatter. Just pure, unadulterated focus.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <div class="divider"></div>
+        <!-- MindSpace Pantry & Refreshments Section -->
+        <section class="w-full espresso-finish py-32 text-alabaster-surface relative">
+            <div
+                class="absolute inset-0 opacity-10 bg-[radial-gradient(#D4B28C_1px,transparent_1px)] [background-size:20px_20px]">
+            </div>
+            <div class="max-w-container-max mx-auto px-margin-edge relative z-10">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-24 items-center">
+                    <div class="space-y-12">
+                        <div class="inline-flex items-center gap-4">
+                            <span class="font-label-caps text-electric-cyan tracking-widest uppercase">Pantry & Refreshments</span>
+                            <div class="w-12 h-px bg-electric-cyan"></div>
+                        </div>
+                        <div class="space-y-4">
+                            <h2 class="font-headline-lg text-headline-lg leading-tight">
+                                Clean Pantry <br />
+                                <span
+                                    class="text-birch-accent italic underline decoration-electric-cyan/30 decoration-8 underline-offset-[12px]">Lounge Area.</span>
+                            </h2>
+                            <p class="text-white/70 font-body-lg max-w-md">Dedicated space for meals, coffee breaks, and relaxation during long study sessions.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Mantra Section -->
+        <section class="w-full bg-ink-charcoal py-32 overflow-hidden border-t border-white/5">
+            <div class="max-w-container-max mx-auto px-margin-edge">
+                <div class="relative text-center">
+                    <span
+                        class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-display-xl text-[280px] text-alabaster-surface/5 pointer-events-none select-none tracking-tighter">POSSIBILITY</span>
+                    <h2 class="relative z-10 font-headline-lg text-headline-lg text-alabaster-surface leading-[1.1]">
+                        "BOOKS OPEN <span
+                            class="text-birch-accent italic underline decoration-electric-cyan decoration-1 underline-offset-8">MIND</span>,
+                        <br />
+                        MINDSPACE OPEN <span class="text-electric-cyan">POSSIBILITIES</span>."
+                    </h2>
+                    <div class="mt-16 flex flex-col items-center gap-6">
+                        <div class="w-px h-16 bg-gradient-to-b from-electric-cyan to-transparent"></div>
+                        <p class="font-label-caps text-electric-cyan tracking-[0.4em] text-[10px] uppercase">Our Core
+                            Philosophy</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Founder's Note -->
+        <section class="w-full bg-alabaster-surface py-24 px-margin-edge">
+            <div class="max-w-container-max mx-auto">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-gutter items-center">
+                    <div class="md:col-span-5">
+                        <div class="aspect-square rounded-[48px] overflow-hidden wood-stroke shadow-2xl relative group">
+                            <img alt="Harsh Goyal - Founder"
+                                class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                src="https://lh3.googleusercontent.com/aida/AP1WRLsTaeiRjnDY_IpkeQNRs2HQzxF4xWYAuuAYhLsKgx7bQrIC6jqeqTegSmHYBGPIA98mEcK2XseMxqy3XoeekXNFFRdufGLSECUgZzi8FfLzMovzhs4JPFCiipJeT1NpVldRJJePJ2ncUkTPLHVQKLpnvMz9BKgshSdfS7MhHyKpIvs6leV14s1HLj1yrHyeDAQJbMMOctF5Sv8_nnk0XG-ZEbd5F3_AAKiS9DUTNU22fEi0u9eKFVBfdIkb" />
+                            <div class="absolute inset-0 bg-electric-cyan/10 mix-blend-overlay"></div>
+                        </div>
+                    </div>
+                    <div class="md:col-span-7 space-y-8 pl-0 md:pl-12">
+                        <div class="inline-flex flex-col">
+                            <span
+                                class="font-label-caps text-electric-cyan text-[10px] tracking-widest uppercase font-bold">Visionaries
+                                of Ambikapur</span>
+                            <div class="w-12 h-px bg-electric-cyan mt-1"></div>
+                        </div>
+                        <h2 class="font-headline-lg text-headline-lg text-ink-charcoal">Letter from the Founder</h2>
+                        <div class="font-quote-editorial text-on-surface-variant space-y-6 leading-relaxed text-xl">
+                            <p>"MindSpace was born from a singular realization: that brilliance is universal, but
+                                high-performance environments are often localized to tier-1 cities."</p>
+                            <p>"By bringing a premium sanctuary to Ambikapur, we are not just providing desks; we are
+                                building a stage where local talent can prepare for global excellence. Every detail,
+                                from the acoustics to the lighting, is designed to respect the gravity of your
+                                ambitions."</p>
+                        </div>
+                        <div>
+                            <p class="font-headline-md text-2xl text-ink-charcoal mb-0">Harsh Goyal</p>
+                            <p class="font-label-caps text-electric-cyan text-sm uppercase font-bold">Founder, MindSpace
+                                Library</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <div class="divider"></div>
+        <!-- Sanctuary Life Gallery with Hover Effects -->
+        <section class="w-full py-24 bg-surface-container/20">
+            <div class="max-w-container-max mx-auto px-margin-edge">
+                <div class="flex flex-col md:flex-row justify-between items-end mb-16 gap-8">
+                    <div class="max-w-xl">
+                        <h2 class="font-headline-lg text-headline-lg text-ink-charcoal mb-4">Sanctuary Life</h2>
+                        <p class="font-body-lg text-on-surface-variant opacity-70">A glimpse into the textures, flavors,
+                            and moments of focus that define the MindSpace experience.</p>
+                    </div>
+                    <button
+                        class="font-label-caps text-electric-cyan border-b border-electric-cyan/30 pb-1 hover:border-electric-cyan transition-all mb-4 uppercase font-bold">View
+                        Full Archive</button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="relative rounded-[40px] overflow-hidden wood-stroke group h-[400px]">
+                        <img alt="The Brew Lab"
+                            class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0MejYoWhqmccvwJEw02WgSNTQ7QclbKcPcnU4d6S3593W-mk4-SkmaE14-6qKqYCeY2IJGQHTevH91rmGVC9Kh2mYRJ-gRJm54mhDVqf-O5VTSZ6Qt9s8Wxn0SkWWkULU2jUc6bLcniUzNIEpKFd9S69i7lbEq51bC9UuRRYltDdIMhdl5NFWNBoM12bI_xHOqC9FKzvMsIqoDHyNyihXg0BI7AMSky94fgWDnrmMegVso0eWb0ZVy6jRmfrB1ADrIUMrSJ1iyamz" />
+                        <div
+                            class="absolute inset-0 bg-ink-charcoal/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                            <div
+                                class="text-center transform translate-y-4 group-hover:translate-y-0 transition-transform">
+                                <span class="font-headline-md text-white text-3xl">The Brew Lab</span>
+                                <div class="w-8 h-1 bg-electric-cyan mx-auto mt-2"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 gap-8">
+                        <div class="relative rounded-[40px] overflow-hidden wood-stroke group h-[184px]">
+                            <img alt="Focus Cabin"
+                                class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                                src="https://lh3.googleusercontent.com/aida-public/AB6AXuC6_g3BIe_-nA0i2c_jPknM5m8QwFTvgSG34rtjI6Bq5VrNMOIuHbm5iaq5qdD4BBYXSJGnGvTBh9QLEWERyJ92gcGBr7zwhlhIGi5zr5uYPcq3wE3tki8wMfS5BShysQjI2oSnS06Tg-3xSI_qEsSSKkYuQ22ZA5EtnTS85bkvxOMlVOeMIGi3Td2J2zzcV2eVsyz-R49oxMljq2-Li7coluxfNNW2ig2sI522v35I6s6HYRyMCYW07Mn4YzR9Hv_luDz0wXHC3r0h" />
+                            <div
+                                class="absolute inset-0 bg-ink-charcoal/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                                <div
+                                    class="text-center transform translate-y-4 group-hover:translate-y-0 transition-transform">
+                                    <span class="font-headline-md text-white text-2xl">Focus Cabin</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-8">
+                            <div class="relative rounded-[40px] overflow-hidden wood-stroke group h-[184px]">
+                                <img alt="The Archives"
+                                    class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuBNd1H6uxwRjQaB8Hpdq4TNQQXoWjRk1aEJxkvp7x0nP7GabC9JJ9KryLllZthIk3uR_f66yjGO2XYwOc8RgR_N4LGnH8lX5UA6_4rIlT1gnqaDiKfS6PddldEPKXggjA6-UgHuXn2ftvLbbFhYo7CIcQE_vCQ2J9rPTNVKuV8sOFDhFHcWC8btjp76fHEYj5tv3dOIzcfyqAADNIhT_DfTl3SFHCzwD0qLynWsfzKV_QQD-0OsQ_OW-nY1j4hgjCjRcdx7xldtiq81" />
+                                <div
+                                    class="absolute inset-0 bg-ink-charcoal/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                                    <div
+                                        class="text-center transform translate-y-4 group-hover:translate-y-0 transition-transform">
+                                        <span class="font-headline-md text-white text-xl">The Archives</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="relative rounded-[40px] overflow-hidden wood-stroke group h-[184px]">
+                                <img alt="Tech Core"
+                                    class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuAn9bqCgRc73kAZdTel37PI5Umu7TdswxIlZ_BWa9SqS4AfXsiQbw5Rb_8ObeX67TFlECYGy0iS5LzRNvUOe-baJGcU4qlWSFP3fULAe2JlNnzfMkxIyqfawfikpdwJVj3LBNHa65ifmaKlkkkg68dIepko85FmWIdAftnvMbOHxIjvj6-VEfP3038dawktyGyaZvjN6oe-1b1ATeFdJEtLUf6_0M0b8w2-1E3727W5xC6hL2ZUuwEuQK9dxuH1LvV_nrMHpqBHT3_u" />
+                                <div
+                                    class="absolute inset-0 bg-ink-charcoal/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                                    <div
+                                        class="text-center transform translate-y-4 group-hover:translate-y-0 transition-transform">
+                                        <span class="font-headline-md text-white text-xl">Tech Core</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Google Reviews Marquee -->
+        <section class="py-24 bg-alabaster-surface border-y border-outline-variant/20 overflow-hidden">
+            <div class="max-w-container-max mx-auto px-margin-edge mb-12">
+                <div class="flex items-center gap-4">
+                    <span class="font-label-caps text-electric-cyan font-bold tracking-widest">GOOGLE REVIEWS</span>
+                    <div class="flex text-electric-cyan">
+                        <span class="material-symbols-outlined text-sm">star</span>
+                        <span class="material-symbols-outlined text-sm">star</span>
+                        <span class="material-symbols-outlined text-sm">star</span>
+                        <span class="material-symbols-outlined text-sm">star</span>
+                        <span class="material-symbols-outlined text-sm">star</span>
+                    </div>
+                </div>
+            </div>
+            <div class="marquee-container">
+                <div class="marquee-content">
+                    <!-- Review 1 -->
+                    <div class="w-[400px] p-8 bg-white rounded-3xl wood-stroke shadow-sm flex flex-col gap-4">
+                        <div class="flex items-center gap-4">
+                            <div
+                                class="w-12 h-12 bg-surface-container rounded-full flex items-center justify-center font-bold text-ink-charcoal">
+                                A</div>
+                            <div>
+                                <p class="font-bold text-ink-charcoal">Amit Sharma</p>
+                                <p class="text-[10px] text-outline uppercase tracking-tighter">Local Guide</p>
+                            </div>
+                        </div>
+                        <div class="flex text-electric-cyan gap-0.5">
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                        </div>
+                        <p class="text-body-md text-on-surface-variant italic">"Best library in Ambikapur. The silence
+                            is actually maintained, and the fiber WiFi is incredibly fast for my online lectures."</p>
+                    </div>
+                    <!-- Review 2 -->
+                    <div class="w-[400px] p-8 bg-white rounded-3xl wood-stroke shadow-sm flex flex-col gap-4">
+                        <div class="flex items-center gap-4">
+                            <div
+                                class="w-12 h-12 bg-surface-container rounded-full flex items-center justify-center font-bold text-ink-charcoal">
+                                R</div>
+                            <div>
+                                <p class="font-bold text-ink-charcoal">Riya Gupta</p>
+                                <p class="text-[10px] text-outline uppercase tracking-tighter">Medical Student</p>
+                            </div>
+                        </div>
+                        <div class="flex text-electric-cyan gap-0.5">
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                        </div>
+                        <p class="text-body-md text-on-surface-variant italic">"The peaceful study environment and spacious cabins are a
+                            game changer. I've increased my study hours significantly since joining."</p>
+                    </div>
+                    <!-- Review 3 -->
+                    <div class="w-[400px] p-8 bg-white rounded-3xl wood-stroke shadow-sm flex flex-col gap-4">
+                        <div class="flex items-center gap-4">
+                            <div
+                                class="w-12 h-12 bg-surface-container rounded-full flex items-center justify-center font-bold text-ink-charcoal">
+                                S</div>
+                            <div>
+                                <p class="font-bold text-ink-charcoal">Sanjeev Verma</p>
+                                <p class="text-[10px] text-outline uppercase tracking-tighter">UPSC Aspirant</p>
+                            </div>
+                        </div>
+                        <div class="flex text-electric-cyan gap-0.5">
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                        </div>
+                        <p class="text-body-md text-on-surface-variant italic">"Very professional environment. The
+                            ergonomic chairs are perfect for long sitting hours. Highly recommended for serious
+                            aspirants."</p>
+                    </div>
+                    <!-- Cloned for loop -->
+                    <div class="w-[400px] p-8 bg-white rounded-3xl wood-stroke shadow-sm flex flex-col gap-4">
+                        <div class="flex items-center gap-4">
+                            <div
+                                class="w-12 h-12 bg-surface-container rounded-full flex items-center justify-center font-bold text-ink-charcoal">
+                                A</div>
+                            <div>
+                                <p class="font-bold text-ink-charcoal">Amit Sharma</p>
+                                <p class="text-[10px] text-outline uppercase tracking-tighter">Local Guide</p>
+                            </div>
+                        </div>
+                        <div class="flex text-electric-cyan gap-0.5">
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                            <span class="material-symbols-outlined text-xs fill-1"
+                                style="font-variation-settings: 'FILL' 1;">star</span>
+                        </div>
+                        <p class="text-body-md text-on-surface-variant italic">"Best library in Ambikapur. The silence
+                            is actually maintained, and the fiber WiFi is incredibly fast."</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Membership Plans Pricing Section -->
+        <section class="w-full py-32 bg-surface-container/10">
+            <div class="max-w-container-max mx-auto px-margin-edge">
+                <div class="text-center mb-20">
+                    <span
+                        class="font-label-caps text-electric-cyan font-bold tracking-[0.3em] uppercase mb-4 block">INVEST
+                        IN YOURSELF</span>
+                    <h2 class="font-headline-lg text-headline-lg text-ink-charcoal">Membership Plans</h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-4xl mx-auto">
+                    <!-- Half Day Plan -->
+                    <div
+                        class="bg-white rounded-[48px] p-12 wood-stroke shadow-xl relative overflow-hidden group hover:border-electric-cyan/40 transition-all">
+                        <div class="flex justify-between items-start mb-8">
+                            <div>
+                                <h3 class="font-headline-md text-2xl text-ink-charcoal mb-2">Half Day</h3>
+                                <p class="text-on-surface-variant text-sm font-label-caps opacity-60">7 HOURS SHIFT</p>
+                            </div>
+                            <span class="material-symbols-outlined text-birch-accent text-4xl">schedule</span>
+                        </div>
+                        <div class="mb-8">
+                            <span class="text-4xl font-headline-lg text-ink-charcoal">₹599</span>
+                            <span class="text-outline font-label-caps">/MONTH</span>
+                        </div>
+                        <div class="space-y-4 mb-12">
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-electric-cyan text-sm">check_circle</span>
+                                <span class="text-body-md opacity-80">Dedicated Personal Cabin</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-electric-cyan text-sm">check_circle</span>
+                                <span class="text-body-md opacity-80">High-Speed Fiber WiFi</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-electric-cyan text-sm">check_circle</span>
+                                <span class="text-body-md opacity-80">Charging Point Access</span>
+                            </div>
+                            <div class="flex items-center gap-3 opacity-30">
+                                <span class="material-symbols-outlined text-sm">cancel</span>
+                                <span class="text-body-md">Personal Storage Locker</span>
+                            </div>
+                        </div>
+                        <button
+                            class="w-full py-4 rounded-full border-2 border-ink-charcoal font-label-caps text-ink-charcoal hover:bg-ink-charcoal hover:text-white transition-all uppercase tracking-widest font-bold">Select
+                            Shift</button>
+                    </div>
+                    <!-- Full Day Plan -->
+                    <div
+                        class="bg-ink-charcoal rounded-[48px] p-12 shadow-[0_30px_60px_rgba(0,168,204,0.15)] relative overflow-hidden group border-2 border-electric-cyan">
+                        <div
+                            class="absolute top-0 right-0 bg-electric-cyan text-white px-8 py-2 font-label-caps text-[10px] tracking-widest transform rotate-45 translate-x-8 translate-y-4 uppercase">
+                            Popular</div>
+                        <div class="flex justify-between items-start mb-8">
+                            <div>
+                                <h3 class="font-headline-md text-2xl text-alabaster-surface mb-2">Full Day</h3>
+                                <p class="text-electric-cyan text-sm font-label-caps opacity-80">15 HOURS ACCESS</p>
+                            </div>
+                            <span class="material-symbols-outlined text-electric-cyan text-4xl">workspace_premium</span>
+                        </div>
+                        <div class="mb-8">
+                            <span class="text-4xl font-headline-lg text-alabaster-surface">₹1,099</span>
+                            <span class="text-white/40 font-label-caps">/MONTH</span>
+                        </div>
+                        <div class="space-y-4 mb-12">
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-electric-cyan text-sm">verified</span>
+                                <span class="text-body-md text-white/90">Unlimited Access (07:00-22:00)</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-electric-cyan text-sm">verified</span>
+                                <span class="text-body-md text-white/90">Premium Ergonomic Seating</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-electric-cyan text-sm">verified</span>
+                                <span class="text-body-md text-white/90">Priority Locker Assignment</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-electric-cyan text-sm">verified</span>
+                                <span class="text-body-md text-white/90">Complimentary Purified Water</span>
+                            </div>
+                        </div>
+                        <button
+                            class="w-full py-4 rounded-full bg-electric-cyan text-white font-label-caps hover:brightness-110 transition-all uppercase tracking-widest font-bold shadow-lg cyan-glow">Claim
+                            Sanctuary</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Join the Sanctuary Enquiry Section -->
+        <section class="w-full py-24 bg-alabaster-surface relative overflow-hidden">
+            <div
+                class="max-w-container-max mx-auto px-margin-edge grid grid-cols-1 lg:grid-cols-2 gap-24 items-center relative z-10">
+                <div class="space-y-10">
+                    <div class="inline-flex items-center gap-4">
+                        <span class="font-label-caps text-electric-cyan tracking-widest uppercase font-bold">Limited
+                            Enrollment</span>
+                        <div class="w-12 h-px bg-electric-cyan"></div>
+                    </div>
+                    <h2 class="font-headline-lg text-headline-lg text-ink-charcoal">Join the <span
+                            class="text-electric-cyan italic">Sanctuary</span>.</h2>
+                    <p class="font-body-lg text-on-surface-variant max-w-md">Our intake process is limited to ensure the
+                        preservation of silence. Register your interest for the upcoming intake cycle.</p>
+                    <div class="space-y-6">
+                        <div class="flex gap-6 items-center">
+                            <span class="material-symbols-outlined text-electric-cyan font-bold">verified</span>
+                            <span class="font-label-caps text-on-surface uppercase tracking-wider font-bold">Verified
+                                Silent Environment</span>
+                        </div>
+                        <div class="flex gap-6 items-center">
+                            <span class="material-symbols-outlined text-electric-cyan font-bold">chair</span>
+                            <span class="font-label-caps text-on-surface uppercase tracking-wider font-bold">Premium
+                                Ergonomic Cabin Access</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white p-12 rounded-[48px] wood-stroke shadow-2xl relative">
+                    <div class="absolute -top-4 -right-4 bg-electric-cyan text-white p-4 rounded-full shadow-lg">
+                        <span class="material-symbols-outlined">edit_note</span>
+                    </div>
+                    <form class="space-y-8">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div class="space-y-2">
+                                <label class="font-label-caps text-[10px] text-electric-cyan uppercase font-bold">Full
+                                    Name</label>
+                                <input
+                                    class="w-full bg-surface-container-low border-none rounded-xl px-6 py-4 focus:ring-2 focus:ring-electric-cyan transition-all font-body-md"
+                                    placeholder="John Doe" type="text" />
+                            </div>
+                            <div class="space-y-2">
+                                <label class="font-label-caps text-[10px] text-electric-cyan uppercase font-bold">Phone
+                                    Number</label>
+                                <input
+                                    class="w-full bg-surface-container-low border-none rounded-xl px-6 py-4 focus:ring-2 focus:ring-electric-cyan transition-all font-body-md"
+                                    placeholder="+91 00000 00000" type="tel" />
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <label class="font-label-caps text-[10px] text-electric-cyan uppercase font-bold">Shift
+                                Preference</label>
+                            <select
+                                class="w-full bg-surface-container-low border-none rounded-xl px-6 py-4 focus:ring-2 focus:ring-electric-cyan transition-all font-body-md appearance-none">
+                                <option>Early Bird (07:00 - 14:00)</option>
+                                <option>Mid-Day (14:00 - 21:00)</option>
+                                <option>Full Day Sanctuary (07:00 - 22:00)</option>
+                                <option>Night Owl (Coming Soon)</option>
+                            </select>
+                        </div>
+                        <button
+                            class="w-full bg-ink-charcoal text-alabaster-surface font-label-caps py-6 rounded-full hover:bg-electric-cyan transition-all shadow-lg tracking-widest font-bold"
+                            type="submit">
+                            REQUEST ENROLLMENT
+                        </button>
+                    </form>
+                </div>
+            </div>
+            <!-- Background Decoration -->
+            <div class="absolute -bottom-24 -right-24 w-96 h-96 bg-electric-cyan/5 rounded-full blur-3xl"></div>
+        </section>
+        <!-- CTA Banner -->
+        <section class="w-full px-margin-edge -mb-12 relative z-20">
+            <div
+                class="max-w-container-max mx-auto bg-birch-accent rounded-[64px] p-16 md:p-24 overflow-hidden relative border-4 border-electric-cyan/20 shadow-2xl">
+                <div class="absolute inset-0 paper-texture opacity-20"></div>
+                <div class="absolute inset-0 bg-gradient-to-r from-ink-charcoal/20 to-transparent"></div>
+                <div
+                    class="relative z-10 flex flex-col md:flex-row items-center justify-between gap-12 text-center md:text-left">
+                    <div class="max-w-2xl">
+                        <h2 class="font-headline-lg text-white mb-6 leading-tight">READY TO WORK?<br /><span
+                                class="text-electric-cyan">WE ARE READY.</span></h2>
+                        <p class="font-body-lg text-white/90">Join the sanctuary membership today and secure your
+                            dedicated ergonomic cabin. Space is limited to preserve silence.</p>
+                    </div>
+                    <div class="flex-shrink-0">
+                        <a class="px-12 py-8 bg-ink-charcoal text-white rounded-full font-label-caps text-body-lg hover:bg-electric-cyan hover:text-white transition-all shadow-xl block font-bold cyan-glow"
+                            href="#">CLAIM YOUR CABIN</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- Counter Animation Script -->
+        <script>
+            const counters = document.querySelectorAll('.counter');
+            const observerOptions = { threshold: 0.5 };
+
+            const animateCounters = (entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const counter = entry.target;
+                        const target = parseFloat(counter.getAttribute('data-target'));
+                        const isDecimal = counter.getAttribute('data-decimal') === 'true';
+                        let count = 0;
+                        const duration = 2000;
+                        const startTime = performance.now();
+
+                        const update = (currentTime) => {
+                            const elapsed = currentTime - startTime;
+                            const progress = Math.min(elapsed / duration, 1);
+
+                            const easeProgress = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+                            const currentVal = target * easeProgress;
+
+                            if (isDecimal) {
+                                counter.innerText = currentVal.toFixed(1);
+                            } else {
+                                counter.innerText = Math.floor(currentVal);
+                            }
+
+                            if (progress < 1) {
+                                requestAnimationFrame(update);
+                            } else {
+                                counter.innerText = isDecimal ? target.toFixed(1) : target;
+                            }
+                        };
+                        requestAnimationFrame(update);
+                        observer.unobserve(counter);
+                    }
+                });
+            };
+
+            const counterObserver = new IntersectionObserver(animateCounters, observerOptions);
+            counters.forEach(c => counterObserver.observe(c));
+        </script>
+    </main>
+    <footer class="bg-ink-charcoal text-alabaster-surface py-24 mt-24">
+        <div class="max-w-container-max mx-auto px-margin-edge grid grid-cols-1 md:grid-cols-3 gap-gutter items-center">
+            <div class="space-y-4">
+                <div class="flex items-center gap-2">
+                    <img alt="Logo" class="h-8 brightness-0 invert"
+                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1l_IH7heHOr3bENDnQaBBt39_h9zVc2HAmjfGDlbYd_N3qiA3sk4R7fANJaKNXgX2XzOHLFCtu4TZjTjJbUrL3cd_4DcWcpAeIfUDZk8J4Y5hjJlkW-KzptHZkE0rW2bCrCgM_Bf7tD5TTcXfiXnTIZHgZmGhn62QagOELNX7m3Y65_Y_MAbNxAy6VIUjeVGotgn2wUXKf1Vwr_2hGyjwkNlFxMT0IZDTNgKrw-_CBnx3GkmhOR2NuJzzGbSF2ExI6snfLbqS6FdT" />
+                    <span class="font-headline-md text-body-lg">MindSpace</span>
+                </div>
+                <p class="font-quote-editorial text-body-md italic opacity-60 uppercase text-electric-cyan">"BOOKS OPEN
+                    MIND, MINDSPACE OPEN POSSIBILITIES"</p>
+            </div>
+            <div class="space-y-4 text-center md:text-left">
+                <p class="text-label-caps text-electric-cyan uppercase font-bold">Physical Sanctuary</p>
+                <p class="font-body-md">MG Road, Near Goyal Super Mart,<br />Patpariya, Ambikapur,<br />Chhattisgarh -
+                    497001</p>
+            </div>
+            <div class="space-y-4 text-right">
+                <p class="text-label-caps text-electric-cyan uppercase font-bold">Coordinates</p>
+                <p class="font-label-caps text-body-lg tracking-[0.2em]">22.1245, 83.1936</p>
+                <p class="text-[10px] opacity-40 uppercase tracking-tighter">Digital Core: Harsh Goyal</p>
+            </div>
+        </div>
+    </footer>
+</body>
+
+</html>
