@@ -694,7 +694,18 @@ export default function MembersDirectoryPage() {
                   <div><span className="text-slate-400 font-medium block">Shift Plan:</span> <p className="font-bold text-slate-800">{selectedMember.shift}</p></div>
                   <div><span className="text-slate-400 font-medium block">Assigned Seat:</span> <p className="font-mono font-bold text-cyan-700">{selectedMember.seat_no || "Unassigned"}</p></div>
                   <div><span className="text-slate-400 font-medium block">Locker Assigned:</span> <p className="font-mono font-bold text-purple-700">{selectedMember.has_locker ? (selectedMember.locker_no || "Yes") : "No Locker"}</p></div>
+                  <div><span className="text-slate-400 font-medium block">Joining Date:</span> <p className="font-mono font-bold text-slate-700">{selectedMember.joining_date || "N/A"}</p></div>
+                  <div><span className="text-slate-400 font-medium block">Sub. Start (Current):</span> <p className="font-mono font-bold text-indigo-600">{(() => {
+                    if (!selectedMember.subscription_end_date) return "N/A";
+                    try {
+                      const endParts = selectedMember.subscription_end_date.split('-').map(Number);
+                      const d = new Date(endParts[0], endParts[1] - 1, endParts[2]);
+                      d.setMonth(d.getMonth() - 1);
+                      return d.toISOString().substring(0, 10);
+                    } catch(e) { return selectedMember.joining_date || "N/A"; }
+                  })()}</p></div>
                   <div><span className="text-slate-400 font-medium block">Subscription End:</span> <p className="font-mono font-bold text-emerald-600">{selectedMember.subscription_end_date}</p></div>
+                  <div><span className="text-slate-400 font-medium block">Duration:</span> <p className="font-mono font-bold text-slate-700">1 Month</p></div>
                   <div><span className="text-slate-400 font-medium block">Outstanding Dues:</span> <p className="font-mono font-bold text-amber-600">₹{selectedMember.outstanding_dues || 0}</p></div>
                   {selectedMember.outstanding_dues > 0 && (
                     <div><span className="text-slate-400 font-medium block">Promised Due Date:</span> <p className="font-mono font-black text-rose-600">{selectedMember.due_date || selectedMember.dues_due_date || "Not Set"}</p></div>

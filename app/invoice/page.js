@@ -85,8 +85,21 @@ function InvoicePrintContent() {
   const mobileNo = member?.mobile || "";
   const shiftName = member?.shift || "Full Day";
   const seatNo = member?.seat_no || "Unassigned";
-  const startDate = member?.joining_date ? member.joining_date.split('-').reverse().join('/') : receiptDate;
+  const joiningDate = member?.joining_date ? member.joining_date.split('-').reverse().join('/') : receiptDate;
   const endDate = member?.subscription_end_date ? member.subscription_end_date.split('-').reverse().join('/') : "N/A";
+
+  // Subscription Start = 1 month before subscription_end_date (current billing cycle start)
+  let subscriptionStartDate = joiningDate;
+  if (member?.subscription_end_date) {
+    try {
+      const endParts = member.subscription_end_date.split('-').map(Number);
+      const endD = new Date(endParts[0], endParts[1] - 1, endParts[2]);
+      endD.setMonth(endD.getMonth() - 1);
+      subscriptionStartDate = `${String(endD.getDate()).padStart(2,'0')}/${String(endD.getMonth()+1).padStart(2,'0')}/${endD.getFullYear()}`;
+    } catch(e) { subscriptionStartDate = joiningDate; }
+  }
+  const startDate = joiningDate; // kept for compatibility
+
   const paidAmount = parseFloat(payment.amount || 0);
   const planAmount = parseFloat(member?.plan_amount || paidAmount);
   const outstandingDues = parseFloat(member?.outstanding_dues || 0);
@@ -308,8 +321,10 @@ function InvoicePrintContent() {
               <p>Shift: <span className="font-bold text-slate-900">{shiftName}</span></p>
               <p>Seat No: <span className="font-bold text-indigo-700 font-mono text-sm">{seatNo}</span></p>
               <p>Locker Facility: <span className={`font-bold font-mono ${member?.has_locker ? "text-emerald-700 font-extrabold" : "text-slate-500"}`}>{member?.has_locker ? `Assigned (${member?.locker_no || 'Standard Locker'})` : 'No Locker Assigned'}</span></p>
-              <p>Join/Start Date: <span className="font-bold text-slate-900 font-mono">{startDate}</span></p>
+              <p>Joining Date: <span className="font-bold text-slate-900 font-mono">{joiningDate}</span></p>
+              <p>Subscription Start: <span className="font-bold text-indigo-700 font-mono">{subscriptionStartDate}</span></p>
               <p>Valid Till: <span className="font-bold text-slate-900 font-mono">{endDate}</span></p>
+              <p>Duration: <span className="font-bold text-slate-900 font-mono">1 Month</span></p>
             </div>
           </div>
         </div>
