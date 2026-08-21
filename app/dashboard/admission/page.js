@@ -127,6 +127,21 @@ export default function NewAdmissionPage() {
         const nextId = getNextPermanentId(all);
         setFormData(prev => ({ ...prev, permanent_id: nextId }));
       }
+
+      // Auto-trigger lookup popup if phone came from URL (e.g. Re-Admit button)
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const phoneParam = params.get("phone") || params.get("mobile");
+        if (phoneParam) {
+          const clean = phoneParam.replace(/\D/g, "");
+          const match = branchMembers.find(m => m.mobile && String(m.mobile).replace(/\D/g, "") === clean)
+            || all.find(m => m.mobile && String(m.mobile).replace(/\D/g, "") === clean);
+          if (match) {
+            setFoundPastStudent(match);
+            setLookupModalOpen(true);
+          }
+        }
+      }
     }
     load();
   }, [activeBranch]);
@@ -1217,10 +1232,19 @@ export default function NewAdmissionPage() {
               <div className="pt-4 border-t border-slate-100">
                 <button
                   type="submit"
-                  className="w-full p-4 rounded-2xl bg-cyan-500 hover:bg-cyan-600 text-white font-black text-sm uppercase tracking-wider shadow-lg shadow-cyan-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className={`w-full p-4 rounded-2xl font-black text-sm uppercase tracking-wider shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    isReadmissionMode
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/25"
+                      : "bg-cyan-500 hover:bg-cyan-600 text-white shadow-cyan-500/25"
+                  }`}
                 >
                   <UserPlus className="w-5 h-5" />
-                  <span>Register Student & Manage Profile / Payment</span>
+                  <span>
+                    {isReadmissionMode
+                      ? `♻ RE-ADMIT ${formData.full_name || 'Student'} (${formData.permanent_id})`
+                      : "Register Student & Manage Profile / Payment"
+                    }
+                  </span>
                 </button>
               </div>
             </form>
