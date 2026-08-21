@@ -225,7 +225,7 @@ function RecordPaymentContent() {
   const [joiningDate, setJoiningDate] = useState(formatDate(new Date()));
   const [overrideExpiryDate, setOverrideExpiryDate] = useState("");
 
-  // Auto-switch scheme & sync locker/date state when student selected
+  // Auto-sync locker/date state when student selected (Runs ONLY when selectedMemberId changes!)
   useEffect(() => {
     if (selectedMemberObj) {
       setIncludeLocker(!!selectedMemberObj.has_locker);
@@ -236,9 +236,7 @@ function RecordPaymentContent() {
       const hasActiveExpiry = subEnd && subEnd >= pDate;
       const nextDayOfExpiry = subEnd ? addDaysToDate(subEnd, 1) : pDate;
 
-      // Only default to COLLECT_DUES if student is paying balance from a PARTIAL payment.
-      // Newly admitted / PAY_LATER / regular renewal defaults to FULL payment!
-      if (selectedMemberObj.payment_status === "PARTIAL" && selectedMemberObj.outstanding_dues > 0) {
+      if (selectedMemberObj.outstanding_dues > 0) {
         setPaymentType("COLLECT_DUES");
         setAmountPaidToday(selectedMemberObj.outstanding_dues);
         setJoiningDate(selectedMemberObj.joining_date || pDate);
@@ -249,9 +247,9 @@ function RecordPaymentContent() {
         setJoiningDate(hasActiveExpiry ? nextDayOfExpiry : pDate);
       }
     }
-  }, [selectedMemberId, paidDate, selectedMemberObj?.payment_status, selectedMemberObj?.outstanding_dues, selectedMemberObj?.has_locker, selectedMemberObj?.subscription_end_date, selectedMemberObj?.joining_date]);
+  }, [selectedMemberId]);
 
-  // Adjust joining date when switching paymentType or changing paidDate
+  // Adjust joining date when switching paymentType
   useEffect(() => {
     if (selectedMemberObj && paymentType !== "COLLECT_DUES") {
       const todayStr = formatDate(new Date());
@@ -261,7 +259,7 @@ function RecordPaymentContent() {
       const nextDayOfExpiry = subEnd ? addDaysToDate(subEnd, 1) : pDate;
       setJoiningDate(hasActiveExpiry ? nextDayOfExpiry : pDate);
     }
-  }, [paymentType, paidDate]);
+  }, [paymentType]);
 
   // Auto-calculated Expiry Date (Joining Date + Duration Days)
   const calculatedExpiryDate = useMemo(() => {

@@ -389,7 +389,7 @@ function InvoicePrintContent() {
               </p>
             )}
             <p className="text-[11px] text-slate-500 font-medium">
-              Recorded on <strong className="font-mono text-slate-700">{receiptDate}</strong> — Joining: {startDate}, Expiry: {endDate}. Base Plan: ₹{planAmount}. Amount Paid: ₹{paidAmount}.
+              Recorded on <strong className="font-mono text-slate-700">{receiptDate}</strong> — Start Date: {subscriptionStartDate}, Expiry: {endDate}. Base Plan: ₹{planAmount}. Amount Paid: ₹{paidAmount}.
             </p>
             {payment.notes && (
               <p className="text-[11px] text-slate-600 italic border-t border-slate-200/60 pt-1 mt-1">
