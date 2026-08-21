@@ -701,7 +701,10 @@ export default function MembersDirectoryPage() {
                       const endParts = selectedMember.subscription_end_date.split('-').map(Number);
                       const d = new Date(endParts[0], endParts[1] - 1, endParts[2]);
                       d.setMonth(d.getMonth() - 1);
-                      return d.toISOString().substring(0, 10);
+                      const y = d.getFullYear();
+                      const mo = String(d.getMonth() + 1).padStart(2, '0');
+                      const dy = String(d.getDate()).padStart(2, '0');
+                      return `${y}-${mo}-${dy}`;
                     } catch(e) { return selectedMember.joining_date || "N/A"; }
                   })()}</p></div>
                   <div><span className="text-slate-400 font-medium block">Subscription End:</span> <p className="font-mono font-bold text-emerald-600">{selectedMember.subscription_end_date}</p></div>

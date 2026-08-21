@@ -95,7 +95,11 @@ function InvoicePrintContent() {
       const endParts = member.subscription_end_date.split('-').map(Number);
       const endD = new Date(endParts[0], endParts[1] - 1, endParts[2]);
       endD.setMonth(endD.getMonth() - 1);
-      subscriptionStartDate = `${String(endD.getDate()).padStart(2,'0')}/${String(endD.getMonth()+1).padStart(2,'0')}/${endD.getFullYear()}`;
+      // Manual format to avoid UTC timezone day-shift bug
+      const y = endD.getFullYear();
+      const mo = String(endD.getMonth() + 1).padStart(2, '0');
+      const d = String(endD.getDate()).padStart(2, '0');
+      subscriptionStartDate = `${d}/${mo}/${y}`;
     } catch(e) { subscriptionStartDate = joiningDate; }
   }
   const startDate = joiningDate; // kept for compatibility
