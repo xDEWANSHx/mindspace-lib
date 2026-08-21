@@ -349,15 +349,21 @@ export default function NewAdmissionPage() {
       permanent_id: student.permanent_id || prev.permanent_id,
       full_name: student.full_name || "",
       father_name: student.father_name || "",
-      mobile: student.mobile || "",
+      mobile: student.mobile || prev.mobile,
       dob: student.dob || "",
       gender: student.gender || "Male",
       address: student.address || "",
       aadhar_no: student.aadhar_no || "",
       targeting_exam: student.targeting_exam || "UPSC CSE",
       shift: student.shift || "Full Day",
+      plan_amount: student.plan_amount || (student.shift === "Full Day" ? 1100 : 600),
       has_locker: student.has_locker || false
     }));
+    // Scroll to form top after modal closes
+    setTimeout(() => {
+      const formEl = document.getElementById("admission-form-section");
+      if (formEl) formEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
   };
 
   const handleResetForm = () => {
@@ -949,22 +955,25 @@ export default function NewAdmissionPage() {
             ) : (
               <>
             {isReadmissionMode && (
-              <div className="bg-amber-900/10 border border-amber-300/80 rounded-2xl p-4 text-xs text-amber-900 font-bold flex items-center justify-between gap-3 shadow-xs">
+              <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-4 text-xs text-emerald-900 font-bold flex items-center justify-between gap-3 shadow-xs animate-fadeIn">
                 <div className="flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                  <span>Re-Admitting Existing Student ({formData.permanent_id} - {formData.full_name}). Lifetime payment history and profile will be seamlessly linked!</span>
+                  <UserCheck className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                  <div>
+                    <p className="font-black text-emerald-900">✅ Form auto-filled from existing student record!</p>
+                    <p className="font-medium text-emerald-800 mt-0.5">Re-Admitting: <strong>{formData.permanent_id}</strong> — {formData.full_name}. Review details below and click Register.</p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={handleResetForm}
-                  className="px-3 py-1.5 rounded-xl bg-amber-200 hover:bg-amber-300 text-amber-950 text-xs font-black shrink-0 transition-colors"
+                  className="px-3 py-1.5 rounded-xl bg-emerald-200 hover:bg-emerald-300 text-emerald-950 text-xs font-black shrink-0 transition-colors"
                 >
-                  Clear Re-Admission
+                  Clear
                 </button>
               </div>
             )}
 
-            <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="space-y-6">
+            <form id="admission-form-section" onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="space-y-6">
             {/* Section 1: Personal Details */}
             <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 space-y-5 shadow-sm">
               <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-3 flex items-center gap-2">
