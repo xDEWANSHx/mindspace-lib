@@ -236,11 +236,50 @@ function InvoicePrintContent() {
     }, 7000);
   };
 
+  const handleSendTextAndPhotoWhatsApp = async () => {
+    setCopyToast("Copying Receipt Photo & Pre-filling Text details...");
+    const message = getFullReceiptText();
+
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const element = document.getElementById("a4-invoice-printable");
+      if (element) {
+        const canvas = await html2canvas(element, { scale: 2, useCORS: true, logging: false });
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            try {
+              await navigator.clipboard.write([
+                new ClipboardItem({ "image/png": blob })
+              ]);
+              setCopyToast("📸 HD Photo copied & Text details pre-filled! Press Ctrl+V in WhatsApp chat to attach Photo!");
+            } catch (err) {
+              setCopyToast("📋 Text details pre-filled in WhatsApp chat!");
+            }
+          }
+        }, "image/png");
+      }
+    } catch (e) {
+      console.warn("Image capture fallback:", e);
+    }
+
+    const cleanMobile = mobileNo ? mobileNo.replace(/\D/g, "") : "";
+    setTimeout(() => {
+      const waUrl = cleanMobile.length === 10
+        ? `https://web.whatsapp.com/send?phone=91${cleanMobile}&text=${encodeURIComponent(message)}`
+        : `https://web.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+      window.open(waUrl, "_blank");
+    }, 400);
+
+    setTimeout(() => {
+      setCopyToast("");
+    }, 8000);
+  };
+
   return (
     <div className="min-h-screen bg-[#0F172A] text-slate-900 font-sans p-4 md:p-10 flex flex-col items-center selection:bg-slate-900 selection:text-white relative">
       {/* Floating Copy Toast Notification */}
       {copyToast && (
-        <div className="fixed top-5 z-50 bg-emerald-600 text-white font-extrabold text-xs px-6 py-3.5 rounded-2xl shadow-2xl border border-emerald-400 animate-bounce flex items-center gap-2">
+        <div className="fixed top-5 z-50 bg-emerald-600 text-white font-extrabold text-xs px-6 py-3.5 rounded-2xl shadow-2xl border border-emerald-400 animate-bounce flex items-center gap-2 max-w-lg text-center">
           <span>{copyToast}</span>
         </div>
       )}
@@ -291,7 +330,7 @@ function InvoicePrintContent() {
           <span>Back to Invoices Ledger</span>
         </Link>
 
-        {/* Action Buttons: Print, Download, Share, Copy & Send via WhatsApp Web */}
+        {/* Action Buttons: Print, Download, Combined Text + Photo, Copy Details, Copy Image */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             onClick={() => window.print()}
@@ -310,21 +349,28 @@ function InvoicePrintContent() {
           </button>
 
           <button
-            onClick={handleCopyDetailsAndOpenWhatsApp}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-600/30 transition-all cursor-pointer ring-2 ring-emerald-400/50"
-            title="Copies full Receipt text details & direct link to PC Clipboard and opens WhatsApp Web. Press Ctrl+V to send!"
+            onClick={handleSendTextAndPhotoWhatsApp}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-xs font-black rounded-xl shadow-xl shadow-emerald-600/30 transition-all cursor-pointer ring-2 ring-emerald-400"
+            title="Pre-fills complete text details in WhatsApp chat & copies HD Photo to Clipboard. Press Ctrl+V in WhatsApp to send BOTH Text & Photo!"
           >
-            <Share2 className="w-4 h-4 text-emerald-200" />
-            <span>Copy Details & Send (Ctrl+V)</span>
+            <Share2 className="w-4 h-4 text-emerald-200 animate-pulse" />
+            <span>Send Text + Photo (Ctrl+V)</span>
+          </button>
+
+          <button
+            onClick={handleCopyDetailsAndOpenWhatsApp}
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-all cursor-pointer"
+            title="Copies full Receipt text details & direct link to PC Clipboard and opens WhatsApp Web."
+          >
+            <span>Copy Text</span>
           </button>
 
           <button
             onClick={handleCopyImageAndOpenWhatsApp}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-700 to-cyan-700 hover:from-teal-600 hover:to-cyan-600 text-white text-xs font-black rounded-xl shadow-lg shadow-cyan-600/30 transition-all cursor-pointer ring-2 ring-cyan-400/50"
-            title="Copies Receipt HD Image to PC Clipboard and opens WhatsApp Web. Press Ctrl+V to send!"
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-all cursor-pointer"
+            title="Copies HD Receipt Photo to PC Clipboard and opens WhatsApp Web."
           >
-            <Share2 className="w-4 h-4 text-cyan-200" />
-            <span>Copy Image & Send (Ctrl+V)</span>
+            <span>Copy Photo</span>
           </button>
         </div>
       </div>
