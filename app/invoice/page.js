@@ -104,7 +104,7 @@ function InvoicePrintContent() {
   const isFullySettled = outstandingDues === 0;
 
   // Locker Details for Invoice
-  const hasLocker = !!(member?.has_locker || (payment?.notes && String(payment.notes).toLowerCase().includes("locker")));
+  const hasLocker = !!(member?.has_locker || payment?.notes?.toLowerCase().includes("locker"));
   const lockerNo = member?.locker_no || "Assigned Locker";
   const lockerFee = hasLocker ? 50 : 0;
   const seatPlanAmount = hasLocker ? Math.max(0, planAmount - lockerFee) : planAmount;
@@ -169,44 +169,67 @@ function InvoicePrintContent() {
 
   const handleCopyImageAndOpenWhatsApp = async () => {
     setCopyToast("Generating Receipt Image...");
+    const element = document.getElementById("a4-invoice-printable");
+    if (!element) return;
+
+    let copiedSuccessfully = false;
+
     try {
       const html2canvas = (await import("html2canvas")).default;
-      const element = document.getElementById("a4-invoice-printable");
-      if (element) {
-        const canvas = await html2canvas(element, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          allowTaint: true
-        });
-        
-        const dataUrl = canvas.toDataURL("image/png");
-        setPreviewImageData(dataUrl);
-        setPreviewModalOpen(true);
 
-        // Try direct clipboard write with blob
-        canvas.toBlob(async (blob) => {
-          if (blob) {
-            try {
-              if (navigator.clipboard && window.ClipboardItem) {
-                await navigator.clipboard.write([
-                  new ClipboardItem({ [blob.type]: blob })
-                ]);
-                setCopyToast("✅ Image copied to Clipboard! In WhatsApp, press Ctrl+V to send!");
-              }
-            } catch (err) {
-              setCopyToast("📋 Image ready in modal! Copy or drag to WhatsApp Web.");
-            }
-          }
-        }, "image/png");
+      // Modern Clipboard API with Promise preserves user gesture token synchronously
+      const p = new Promise(async (resolve, reject) => {
+        try {
+          const canvas = await html2canvas(element, { scale: 2, useCORS: true, logging: false });
+          canvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error("Canvas to blob conversion failed"));
+          }, "image/png");
+        } catch (e) {
+          reject(e);
+        }
+      });
+
+      if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([
+          new ClipboardItem({ "image/png": p })
+        ]);
+        copiedSuccessfully = true;
       }
-    } catch (e) {
-      console.error("Image capture error:", e);
-      setCopyToast("❌ Unable to capture receipt image.");
+    } catch (err) {
+      console.warn("Direct clipboard write failed, triggering instant image download fallback:", err);
     }
+
+    if (copiedSuccessfully) {
+      setCopyToast("📋 Receipt image copied to PC Clipboard! In WhatsApp Web, press Ctrl+V (Paste) to send!");
+    } else {
+      // Fallback if browser blocks clipboard image write: Auto-download receipt image
+      try {
+        const html2canvas = (await import("html2canvas")).default;
+        const canvas = await html2canvas(element, { scale: 2, useCORS: true, logging: false });
+        const imgUrl = canvas.toDataURL("image/png");
+        const a = document.createElement("a");
+        a.href = imgUrl;
+        a.download = `Receipt_${receiptNo}.png`;
+        a.click();
+        setCopyToast("⏬ Receipt image downloaded! Attach/Drag-and-drop it in WhatsApp Web!");
+      } catch (e) {
+        setCopyToast("Opening WhatsApp Web...");
+      }
+    }
+
+    const cleanMobile = mobileNo ? mobileNo.replace(/\D/g, "") : "";
+    setTimeout(() => {
+      if (cleanMobile.length === 10) {
+        window.open(`https://web.whatsapp.com/send?phone=91${cleanMobile}`, "_blank");
+      } else {
+        window.open(`https://web.whatsapp.com/`, "_blank");
+      }
+    }, 600);
+
     setTimeout(() => {
       setCopyToast("");
-    }, 7000);
+    }, 8000);
   };
 
   return (
@@ -551,84 +574,6 @@ function InvoicePrintContent() {
         </div>
 
       </div>
-
-      {/* 📸 RECEIPT IMAGE PREVIEW MODAL */}
-      {previewModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/85 z-50 backdrop-blur-md flex items-center justify-center p-4 print-hidden animate-fade-in">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-2xl w-full p-6 text-slate-100 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div>
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <span>📸</span> Fee Receipt Image Ready
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Copy image or click Open WhatsApp Web to paste (<kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] font-mono text-cyan-300">Ctrl+V</kbd>)!
-                </p>
-              </div>
-              <button
-                onClick={() => setPreviewModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-sm font-bold transition-colors"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Receipt Image Container */}
-            {previewImageData ? (
-              <div className="bg-white/5 p-3 rounded-2xl border border-slate-800 text-center">
-                <img
-                  src={previewImageData}
-                  alt="Fee Receipt Preview"
-                  className="max-h-[50vh] mx-auto rounded-xl shadow-xl border border-slate-200/20 object-contain"
-                />
-              </div>
-            ) : (
-              <div className="py-12 text-center text-xs text-slate-400">
-                Processing high-resolution receipt image...
-              </div>
-            )}
-
-            {/* Action Toolbar Inside Modal */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-              <button
-                onClick={() => {
-                  const cleanMobile = mobileNo ? mobileNo.replace(/\D/g, "") : "";
-                  const waUrl = cleanMobile.length === 10
-                    ? `https://web.whatsapp.com/send?phone=91${cleanMobile}`
-                    : `https://web.whatsapp.com/`;
-                  window.open(waUrl, "_blank");
-                }}
-                className="flex-1 min-w-[180px] inline-flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all"
-              >
-                <span>💬 Open WhatsApp Web</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  if (previewImageData) {
-                    const link = document.createElement("a");
-                    link.href = previewImageData;
-                    link.download = `Fee_Receipt_${receiptNo}.png`;
-                    link.click();
-                  }
-                }}
-                className="inline-flex items-center justify-center gap-2 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 transition-all"
-              >
-                <span>📥 Download PNG</span>
-              </button>
-
-              <button
-                onClick={() => setPreviewModalOpen(false)}
-                className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-bold rounded-xl transition-all"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
