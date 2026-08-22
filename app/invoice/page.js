@@ -134,8 +134,7 @@ function InvoicePrintContent() {
     return `http://localhost:3000/invoice?id=${receiptNo}`;
   };
 
-  // WhatsApp Share Handler with Direct Receipt URL Link
-  const handleWhatsAppShare = () => {
+  const getFullReceiptText = () => {
     const directUrl = getInvoiceDirectUrl();
     let message = `*MINDSPACE LIBRARY - OFFICIAL FEE RECEIPT*\n` +
       `Receipt No: ${receiptNo}\n` +
@@ -159,12 +158,41 @@ function InvoicePrintContent() {
     message += `\n📄 *View / Download Online Fee Receipt:* \n${directUrl}\n\n` +
       `Thank you for studying at MindSpace Library!`;
 
+    return message;
+  };
+
+  // WhatsApp Share Handler with Direct Receipt URL Link
+  const handleWhatsAppShare = () => {
+    const message = getFullReceiptText();
     const cleanMobile = mobileNo ? mobileNo.replace(/\D/g, "") : "";
     if (cleanMobile.length === 10) {
       window.open(`https://api.whatsapp.com/send?phone=91${cleanMobile}&text=${encodeURIComponent(message)}`, "_blank");
     } else {
       window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`, "_blank");
     }
+  };
+
+  const handleCopyDetailsAndOpenWhatsApp = async () => {
+    const message = getFullReceiptText();
+    try {
+      await navigator.clipboard.writeText(message);
+      setCopyToast("📋 Full Receipt details & Link copied to PC Clipboard! In WhatsApp, press Ctrl+V to send!");
+    } catch (err) {
+      setCopyToast("📋 Opening WhatsApp... Paste (Ctrl+V) receipt!");
+    }
+
+    const cleanMobile = mobileNo ? mobileNo.replace(/\D/g, "") : "";
+    setTimeout(() => {
+      if (cleanMobile.length === 10) {
+        window.open(`https://web.whatsapp.com/send?phone=91${cleanMobile}`, "_blank");
+      } else {
+        window.open(`https://web.whatsapp.com/`, "_blank");
+      }
+    }, 400);
+
+    setTimeout(() => {
+      setCopyToast("");
+    }, 7000);
   };
 
   const handleCopyImageAndOpenWhatsApp = async () => {
@@ -182,7 +210,10 @@ function InvoicePrintContent() {
               ]);
               setCopyToast("📋 Receipt image copied to PC Clipboard! In WhatsApp Web, press Ctrl+V (Paste) to send!");
             } catch (err) {
-              setCopyToast("📋 Opening WhatsApp Web... Paste (Ctrl+V) & send receipt!");
+              // Fallback to text copy
+              const message = getFullReceiptText();
+              await navigator.clipboard.writeText(message);
+              setCopyToast("📋 Receipt details copied to Clipboard! In WhatsApp Web, press Ctrl+V (Paste) to send!");
             }
           }
         }, "image/png");
@@ -279,20 +310,21 @@ function InvoicePrintContent() {
           </button>
 
           <button
-            onClick={handleWhatsAppShare}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#10B981] hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg transition-all cursor-pointer"
+            onClick={handleCopyDetailsAndOpenWhatsApp}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-600/30 transition-all cursor-pointer ring-2 ring-emerald-400/50"
+            title="Copies full Receipt text details & direct link to PC Clipboard and opens WhatsApp Web. Press Ctrl+V to send!"
           >
-            <Share2 className="w-4 h-4" />
-            <span>Share Link</span>
+            <Share2 className="w-4 h-4 text-emerald-200" />
+            <span>Copy Details & Send (Ctrl+V)</span>
           </button>
 
           <button
             onClick={handleCopyImageAndOpenWhatsApp}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-600/30 transition-all cursor-pointer ring-2 ring-emerald-400/50"
-            title="Copies Receipt Image to PC Clipboard and opens WhatsApp Web. In WhatsApp, press Ctrl+V to send!"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-700 to-cyan-700 hover:from-teal-600 hover:to-cyan-600 text-white text-xs font-black rounded-xl shadow-lg shadow-cyan-600/30 transition-all cursor-pointer ring-2 ring-cyan-400/50"
+            title="Copies Receipt HD Image to PC Clipboard and opens WhatsApp Web. Press Ctrl+V to send!"
           >
-            <Share2 className="w-4 h-4 text-emerald-200" />
-            <span>Copy & Send via WhatsApp (Ctrl+V)</span>
+            <Share2 className="w-4 h-4 text-cyan-200" />
+            <span>Copy Image & Send (Ctrl+V)</span>
           </button>
         </div>
       </div>
