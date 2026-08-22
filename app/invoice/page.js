@@ -104,7 +104,7 @@ function InvoicePrintContent() {
   const isFullySettled = outstandingDues === 0;
 
   // Locker Details for Invoice
-  const hasLocker = !!(member?.has_locker || payment?.notes?.toLowerCase().includes("locker"));
+  const hasLocker = !!(member?.has_locker || (payment?.notes && String(payment.notes).toLowerCase().includes("locker")));
   const lockerNo = member?.locker_no || "Assigned Locker";
   const lockerFee = hasLocker ? 50 : 0;
   const seatPlanAmount = hasLocker ? Math.max(0, planAmount - lockerFee) : planAmount;
