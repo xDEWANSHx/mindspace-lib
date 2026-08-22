@@ -102,6 +102,8 @@ function InvoicePrintContent() {
   const planAmount = parseFloat(member?.plan_amount || paidAmount);
   const outstandingDues = parseFloat(member?.outstanding_dues || 0);
   const isFullySettled = outstandingDues === 0;
+  // PAY_LATER: subscription activated but ₹0 collected
+  const isPayLater = paidAmount === 0 && outstandingDues > 0;
 
   // Locker Details for Invoice
   const hasLocker = !!(member?.has_locker || payment?.notes?.toLowerCase().includes("locker"));
@@ -139,11 +141,13 @@ function InvoicePrintContent() {
     const directUrl = getInvoiceDirectUrl();
     let message = `*MINDSPACE LIBRARY - OFFICIAL FEE RECEIPT*\n` +
       `Receipt No: ${receiptNo}\n` +
-      `Date Paid: ${receiptDate}\n` +
+      (isPayLater ? `Activated On: ${receiptDate}\n` : `Date Paid: ${receiptDate}\n`) +
       `Student Name: ${studentName}\n` +
       `Allotment ID: ${studentAllotmentNo}\n` +
       `Seat Allocated: ${seatNo} (${shiftName})\n` +
-      `Amount Paid: ₹${paidAmount} (${payment.payment_mode || "Cash"})\n` +
+      (isPayLater
+        ? `Payment Status: PAY LATER (₹${outstandingDues} dues pending)\n`
+        : `Amount Paid: ₹${paidAmount} (${payment.payment_mode || "Cash"})\n`) +
       `Subscription Validity: ${startDate} to ${endDate}\n`;
 
     if (!isFullySettled) {
@@ -372,9 +376,19 @@ function InvoicePrintContent() {
                 <span className="font-bold font-mono text-slate-900">{receiptNo}</span>
               </div>
               <div className="flex justify-between gap-4">
-                <span className="text-slate-400 font-semibold text-[10px] uppercase">DATE PAID</span>
-                <span className="font-bold font-mono text-slate-900">{receiptDate}</span>
+                <span className="text-slate-400 font-semibold text-[10px] uppercase">
+                  {isPayLater ? "ACTIVATED ON" : "DATE PAID"}
+                </span>
+                <span className={`font-bold font-mono ${isPayLater ? "text-amber-700" : "text-slate-900"}`}>
+                  {receiptDate}
+                </span>
               </div>
+              {isPayLater && (
+                <div className="flex justify-between gap-4 pt-1 border-t border-amber-200 mt-1">
+                  <span className="text-amber-600 font-extrabold text-[10px] uppercase">STATUS</span>
+                  <span className="font-black text-[10px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">PAY LATER</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -464,7 +478,10 @@ function InvoicePrintContent() {
               </p>
             )}
             <p className="text-[11px] text-slate-500 font-medium">
-              Recorded on <strong className="font-mono text-slate-700">{receiptDate}</strong> — Start Date: {subscriptionStartDate}, Expiry: {endDate}. Base Plan: ₹{planAmount}. Amount Paid: ₹{paidAmount}.
+              {isPayLater
+                ? <>Subscription activated on <strong className="font-mono text-slate-700">{receiptDate}</strong> under <strong className="text-amber-700">Pay Later</strong> scheme — Start Date: {subscriptionStartDate}, Expiry: {endDate}. Full dues of ₹{outstandingDues} to be cleared by promised date.</>
+                : <>Recorded on <strong className="font-mono text-slate-700">{receiptDate}</strong> — Start Date: {subscriptionStartDate}, Expiry: {endDate}. Base Plan: ₹{planAmount}. Amount Paid: ₹{paidAmount}.</>
+              }
             </p>
             {payment.notes && (
               <p className="text-[11px] text-slate-600 italic border-t border-slate-200/60 pt-1 mt-1">
