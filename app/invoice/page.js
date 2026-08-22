@@ -88,19 +88,12 @@ function InvoicePrintContent() {
   const joiningDate = member?.joining_date ? member.joining_date.split('-').reverse().join('/') : receiptDate;
   const endDate = member?.subscription_end_date ? member.subscription_end_date.split('-').reverse().join('/') : "N/A";
 
-  // Subscription Start = 1 month before subscription_end_date (current billing cycle start)
+  // Subscription Start = payment date or joining date (formatted DD/MM/YYYY)
+  const rawSubStart = payment?.paid_at || payment?.created_at || member?.joining_date;
   let subscriptionStartDate = joiningDate;
-  if (member?.subscription_end_date) {
-    try {
-      const endParts = member.subscription_end_date.split('-').map(Number);
-      const endD = new Date(endParts[0], endParts[1] - 1, endParts[2]);
-      endD.setMonth(endD.getMonth() - 1);
-      // Manual format to avoid UTC timezone day-shift bug
-      const y = endD.getFullYear();
-      const mo = String(endD.getMonth() + 1).padStart(2, '0');
-      const d = String(endD.getDate()).padStart(2, '0');
-      subscriptionStartDate = `${d}/${mo}/${y}`;
-    } catch(e) { subscriptionStartDate = joiningDate; }
+  if (rawSubStart) {
+    const cleanStr = String(rawSubStart).substring(0, 10);
+    subscriptionStartDate = cleanStr.split('-').reverse().join('/');
   }
   const startDate = joiningDate; // kept for compatibility
 
