@@ -82,6 +82,10 @@ function RecordPaymentContent() {
   const [promisedDueDate, setPromisedDueDate] = useState("");
   const [successPayment, setSuccessPayment] = useState(null);
 
+  // Active Student Advance Renewal Confirmation Modal State
+  const [activeConfirmModalOpen, setActiveConfirmModalOpen] = useState(false);
+  const [pendingPaymentPayload, setPendingPaymentPayload] = useState(null);
+
   // Locker Add-On Option
   const [includeLocker, setIncludeLocker] = useState(false);
   const [lockerFee, setLockerFee] = useState(50);
@@ -292,6 +296,49 @@ function RecordPaymentContent() {
   const isTryingNextMonthPayment = paymentType === "FULL" || paymentType === "PARTIAL" || paymentType === "PAY_LATER";
   const isDuesBlocked = hasPendingDues && isTryingNextMonthPayment;
 
+  const executePaymentRecord = async (payload) => {
+    if (!selectedMemberObj) return;
+
+    const p = await recordPayment({
+      member_id: selectedMemberObj.id,
+      member_name: selectedMemberObj.full_name,
+      amount: payload.parsedPaidToday,
+      branch: activeBranch,
+      payment_mode: payload.parsedPaidToday === 0 ? "Deferred" : paymentMode,
+      cash_amount: payload.cPart,
+      online_amount: payload.oPart,
+      notes: payload.finalNote + payload.lockerNoteTag,
+      is_renewal: payload.isRenewalAction,
+      extend_days: payload.extendDays,
+      start_date: payload.joiningDate,
+      end_date: payload.isRenewalAction ? payload.finalExpiryDate : selectedMemberObj.subscription_end_date,
+      new_outstanding_dues: payload.calculatedNewDues,
+      dues_due_date: payload.calculatedNewDues > 0 ? payload.promisedDueDate : null,
+      has_locker: payload.includeLocker,
+      paid_at: payload.paidDate
+    });
+
+    setSuccessPayment(p);
+    
+    // Reset input fields & switch payment scheme back to FULL if dues fully cleared
+    setNotes("");
+    setDiscountAmount(0);
+    setIncludeLocker(false);
+    if (payload.calculatedNewDues === 0) {
+      setPaymentType("FULL");
+    }
+
+    // Refresh live members and payments directly from database
+    const [mList, pList] = await Promise.all([
+      fetchMembers(activeBranch),
+      fetchPayments(activeBranch)
+    ]);
+    setMembers(mList);
+    setPayments(pList);
+    setActiveConfirmModalOpen(false);
+    setPendingPaymentPayload(null);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedMemberObj) return;
@@ -341,43 +388,34 @@ function RecordPaymentContent() {
       ? (selectedMemberObj.has_locker ? "" : " [+ Locker Facility Added]")
       : (selectedMemberObj.has_locker ? " [- Locker Facility Discontinued]" : "");
 
-    const p = await recordPayment({
-      member_id: selectedMemberObj.id,
-      member_name: selectedMemberObj.full_name,
-      amount: parsedPaidToday,
-      branch: activeBranch,
-      payment_mode: parsedPaidToday === 0 ? "Deferred" : paymentMode,
-      cash_amount: cPart,
-      online_amount: oPart,
-      notes: finalNote + lockerNoteTag,
-      is_renewal: isRenewalAction,
-      extend_days: extendDays,
-      start_date: joiningDate,
-      end_date: isRenewalAction ? finalExpiryDate : selectedMemberObj.subscription_end_date,
-      new_outstanding_dues: calculatedNewDues,
-      dues_due_date: calculatedNewDues > 0 ? promisedDueDate : null,
-      has_locker: includeLocker,
-      paid_at: paidDate
-    });
+    const todayStr = formatDate(new Date());
+    const isCurrentlyActive = selectedMemberObj.subscription_end_date && selectedMemberObj.subscription_end_date >= todayStr;
 
-    setSuccessPayment(p);
-    
-    // Reset input fields & switch payment scheme back to FULL if dues fully cleared
-    setNotes("");
-    setDiscountAmount(0);
-    setIncludeLocker(false);
-    if (calculatedNewDues === 0) {
-      setPaymentType("FULL");
+    const payload = {
+      parsedPaidToday,
+      cPart,
+      oPart,
+      finalNote,
+      lockerNoteTag,
+      isRenewalAction,
+      extendDays,
+      joiningDate,
+      finalExpiryDate,
+      calculatedNewDues,
+      promisedDueDate,
+      includeLocker,
+      paidDate,
+      currentExpiry: selectedMemberObj.subscription_end_date
+    };
+
+    // If student is currently active and user is performing a renewal action, prompt for confirmation
+    if (isRenewalAction && isCurrentlyActive) {
+      setPendingPaymentPayload(payload);
+      setActiveConfirmModalOpen(true);
+      return;
     }
 
-    // Refresh live members and payments directly from database
-    const [mList, pList] = await Promise.all([
-      fetchMembers(activeBranch),
-      fetchPayments(activeBranch)
-    ]);
-    setMembers(mList);
-    setPayments(pList);
-    setPayments(pList);
+    await executePaymentRecord(payload);
   };
 
   const handleSelectStudentForPaymentEntry = (memberId, fallbackName) => {
@@ -1447,6 +1485,79 @@ function RecordPaymentContent() {
             </table>
           </div>
         </div>
+
+        {/* ADVANCE RENEWAL CONFIRMATION MODAL FOR ACTIVE STUDENTS */}
+        {activeConfirmModalOpen && pendingPaymentPayload && selectedMemberObj && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fadeIn">
+            <div className="bg-white border border-amber-200 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5 animate-popIn">
+              <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center font-black">
+                  <HelpCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Advance Renewal Confirmation</h3>
+                  <p className="text-xs text-amber-700 font-bold">Student is currently ACTIVE</p>
+                </div>
+              </div>
+
+              <div className="bg-amber-50/80 p-4 rounded-2xl border border-amber-200 text-xs space-y-3">
+                <p className="text-amber-950 font-medium leading-relaxed">
+                  Student <strong className="text-slate-900 font-extrabold">{selectedMemberObj.full_name}</strong> is currently <span className="bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-extrabold border border-emerald-300">ACTIVE</span> until <strong className="font-mono text-cyan-800 font-black">{pendingPaymentPayload.currentExpiry}</strong>.
+                </p>
+
+                <div className="p-3.5 bg-white rounded-2xl border border-amber-200/90 space-y-2 font-mono text-[11px] shadow-2xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 font-sans font-bold">Current Expiration:</span>
+                    <span className="font-black text-slate-800">{pendingPaymentPayload.currentExpiry}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 font-sans font-bold">Upcoming Plan Extension:</span>
+                    <span className="font-black text-amber-700">+{pendingPaymentPayload.extendDays} Days</span>
+                  </div>
+                  <div className="flex justify-between border-t border-slate-100 pt-1.5">
+                    <span className="text-slate-500 font-sans font-bold">New Expiration Date:</span>
+                    <span className="font-black text-emerald-700">{pendingPaymentPayload.finalExpiryDate}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 font-sans font-bold">Amount to Collect Today:</span>
+                    <span className="font-black text-emerald-600">₹{pendingPaymentPayload.parsedPaidToday}</span>
+                  </div>
+                </div>
+
+                <div className="text-slate-900 font-bold text-xs bg-amber-100/90 p-3.5 rounded-2xl border border-amber-300 space-y-1">
+                  <p className="flex items-center gap-1.5 font-extrabold text-amber-950">
+                    <HelpCircle className="w-4 h-4 text-amber-700" />
+                    <span>Advance Payment Confirmation Check:</span>
+                  </p>
+                  <p className="text-slate-800 font-medium">
+                    Advance me upcoming <strong>{pendingPaymentPayload.extendDays} days</strong> (after expiration date <strong>{pendingPaymentPayload.currentExpiry}</strong>) of the particular student ke liye payment record add kar rahe ho?
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveConfirmModalOpen(false);
+                    setPendingPaymentPayload(null);
+                  }}
+                  className="w-full py-3.5 rounded-2xl border border-slate-200 font-extrabold text-xs text-slate-600 hover:bg-slate-100 transition-all cursor-pointer"
+                >
+                  Cancel (Do Not Add)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => executePaymentRecord(pendingPaymentPayload)}
+                  className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-lg shadow-emerald-600/25 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Yes, Add Payment</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* SUCCESS RECEIPT MODAL */}
         {successPayment && (
