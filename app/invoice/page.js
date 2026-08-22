@@ -16,6 +16,7 @@ function InvoicePrintContent() {
   const [payment, setPayment] = useState(null);
   const [member, setMember] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [copyToast, setCopyToast] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -166,8 +167,53 @@ function InvoicePrintContent() {
     }
   };
 
+  const handleCopyImageAndOpenWhatsApp = async () => {
+    setCopyToast("Copying Receipt Image to PC Clipboard...");
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const element = document.getElementById("a4-invoice-printable");
+      if (element) {
+        const canvas = await html2canvas(element, { scale: 2, useCORS: true, logging: false });
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            try {
+              await navigator.clipboard.write([
+                new ClipboardItem({ "image/png": blob })
+              ]);
+              setCopyToast("📋 Receipt image copied to PC Clipboard! In WhatsApp Web, press Ctrl+V (Paste) to send!");
+            } catch (err) {
+              setCopyToast("📋 Opening WhatsApp Web... Paste (Ctrl+V) & send receipt!");
+            }
+          }
+        }, "image/png");
+      }
+    } catch (e) {
+      console.warn("Image capture fallback:", e);
+    }
+
+    const cleanMobile = mobileNo ? mobileNo.replace(/\D/g, "") : "";
+    setTimeout(() => {
+      if (cleanMobile.length === 10) {
+        window.open(`https://web.whatsapp.com/send?phone=91${cleanMobile}`, "_blank");
+      } else {
+        window.open(`https://web.whatsapp.com/`, "_blank");
+      }
+    }, 400);
+
+    setTimeout(() => {
+      setCopyToast("");
+    }, 7000);
+  };
+
   return (
-    <div className="min-h-screen bg-[#0F172A] text-slate-900 font-sans p-4 md:p-10 flex flex-col items-center selection:bg-slate-900 selection:text-white">
+    <div className="min-h-screen bg-[#0F172A] text-slate-900 font-sans p-4 md:p-10 flex flex-col items-center selection:bg-slate-900 selection:text-white relative">
+      {/* Floating Copy Toast Notification */}
+      {copyToast && (
+        <div className="fixed top-5 z-50 bg-emerald-600 text-white font-extrabold text-xs px-6 py-3.5 rounded-2xl shadow-2xl border border-emerald-400 animate-bounce flex items-center gap-2">
+          <span>{copyToast}</span>
+        </div>
+      )}
+
       <style>{`
         @media print {
           @page {
@@ -214,30 +260,39 @@ function InvoicePrintContent() {
           <span>Back to Invoices Ledger</span>
         </Link>
 
-        {/* Action Buttons: Print, Download, Share */}
-        <div className="flex items-center gap-3">
+        {/* Action Buttons: Print, Download, Share, Copy & Send via WhatsApp Web */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             onClick={() => window.print()}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-lg border border-slate-700 transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-lg border border-slate-700 transition-all cursor-pointer"
           >
             <Printer className="w-4 h-4 text-cyan-400" />
-            <span>Print Invoice</span>
+            <span>Print</span>
           </button>
 
           <button
             onClick={() => window.print()}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#4F46E5] hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#4F46E5] hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg transition-all cursor-pointer"
           >
             <Download className="w-4 h-4" />
-            <span>Download PDF</span>
+            <span>PDF</span>
           </button>
 
           <button
             onClick={handleWhatsAppShare}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#10B981] hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#10B981] hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg transition-all cursor-pointer"
           >
             <Share2 className="w-4 h-4" />
-            <span>Share to WhatsApp</span>
+            <span>Share Link</span>
+          </button>
+
+          <button
+            onClick={handleCopyImageAndOpenWhatsApp}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-600/30 transition-all cursor-pointer ring-2 ring-emerald-400/50"
+            title="Copies Receipt Image to PC Clipboard and opens WhatsApp Web. In WhatsApp, press Ctrl+V to send!"
+          >
+            <Share2 className="w-4 h-4 text-emerald-200" />
+            <span>Copy & Send via WhatsApp (Ctrl+V)</span>
           </button>
         </div>
       </div>
