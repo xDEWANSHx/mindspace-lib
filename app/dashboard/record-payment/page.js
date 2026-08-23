@@ -177,14 +177,10 @@ function RecordPaymentContent() {
     } else if (paymentType === "PARTIAL") {
       setAmountPaidToday(Math.round(netPay / 2));
     } else if (paymentType === "COLLECT_DUES") {
-      const selected = members.find(m => m.id === selectedMemberId);
-      const baseDues = selected?.outstanding_dues || 0;
-      const isNewLockerAdd = includeLocker && !selected?.has_locker;
-      const extraLocker = isNewLockerAdd ? parseFloat(lockerFee || 50) : 0;
-      setAmountPaidToday(baseDues + extraLocker);
-      setDiscountAmount(0); // Dues collection has no current month discount
+      setAmountPaidToday(effectivePayable);
+      setDiscountAmount(0);
     }
-  }, [paymentType, planFee, discountAmount, selectedMemberId, members, includeLocker, lockerFee]);
+  }, [paymentType, planFee, discountAmount, effectivePayable]);
 
   useEffect(() => {
     async function load() {
@@ -286,9 +282,7 @@ function RecordPaymentContent() {
   } else if (paymentType === "PAY_LATER") {
     calculatedNewDues = Math.round(effectivePayable);
   } else if (paymentType === "COLLECT_DUES") {
-    const isNewLockerAdd = includeLocker && !selectedMemberObj?.has_locker;
-    const totalDueToClear = currDues + (isNewLockerAdd ? parseFloat(lockerFee || 50) : 0);
-    calculatedNewDues = Math.max(0, Math.round(totalDueToClear - parseFloat(amountPaidToday || 0)));
+    calculatedNewDues = Math.max(0, Math.round(effectivePayable - parseFloat(amountPaidToday || 0)));
   }
 
   // Pending Dues Warning & Block Check
@@ -351,11 +345,32 @@ function RecordPaymentContent() {
     const parsedPaidToday = parseFloat(amountPaidToday) || 0;
     const parsedPlanFee = parseFloat(planFee) || 0;
 
+
     const cPart = paymentMode === "Cash" ? parsedPaidToday : (paymentMode === "Split" ? (parseFloat(cashAmount) || 0) : 0);
     const oPart = (paymentMode === "Online" || paymentMode === "UPI") ? parsedPaidToday : (paymentMode === "Split" ? (parseFloat(onlineAmount) || 0) : 0);
 
     if (paymentMode === "Split" && parsedPaidToday > 0 && (cPart + oPart !== parsedPaidToday)) {
       alert(`Split payment total (Cash ₹${cPart} + Online ₹${oPart} = ₹${cPart + oPart}) does not equal total collected ₹${parsedPaidToday}`);
+      return;
+    }
+
+    // ₹0 Collect Dues = No money exchanged, just update Promised Due Date — no payment record
+    if (paymentType === "COLLECT_DUES" && parsedPaidToday === 0) {
+      if (!promisedDueDate) {
+        alert("Please set a Promised Payment Due Date before saving this Pay Later commitment.");
+        return;
+      }
+      await updateMember(selectedMemberObj.id, {
+        due_date: promisedDueDate,
+        dues_due_date: promisedDueDate
+      });
+      const [mListZ, pListZ] = await Promise.all([
+        fetchMembers(activeBranch),
+        fetchPayments(activeBranch)
+      ]);
+      setMembers(mListZ);
+      setPayments(pListZ);
+      // No payment record — just a silent promised date save
       return;
     }
 
@@ -1298,20 +1313,22 @@ function RecordPaymentContent() {
               )}
 
               {/* DATE PAID & NOTES */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-slate-500 font-bold mb-1 block flex items-center justify-between">
-                    <span>DATE PAID (COLLECTION DATE)</span>
-                    <span className="text-[9px] font-medium text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">Receipt log only • Does not alter study period</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={paidDate}
-                    onChange={(e) => setPaidDate(e.target.value)}
-                    disabled={isDuesBlocked}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none font-bold disabled:opacity-50"
-                  />
-                </div>
+              {/* Date Paid is only shown when actual money is being collected (amount > 0) */}
+              <div className={`grid grid-cols-1 gap-4 ${parseFloat(amountPaidToday) > 0 && !isDuesBlocked ? "sm:grid-cols-2" : ""}`}>
+                {parseFloat(amountPaidToday) > 0 && !isDuesBlocked && (
+                  <div>
+                    <label className="text-slate-500 font-bold mb-1 block flex items-center justify-between">
+                      <span>DATE PAID (COLLECTION DATE)</span>
+                      <span className="text-[9px] font-medium text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">Receipt log only • Does not alter study period</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={paidDate}
+                      onChange={(e) => setPaidDate(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none font-bold"
+                    />
+                  </div>
+                )}
 
                 <div>
                   <label className="text-slate-500 font-bold mb-1 block">NOTES / REMARKS</label>
@@ -1564,10 +1581,12 @@ function RecordPaymentContent() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fadeIn">
             <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-popIn">
               <div className="text-center space-y-2">
-                <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto text-emerald-600">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto ${successPayment?.amount === 0 ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600"}`}>
                   <CheckCircle2 className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-black text-slate-900">Payment Verified & Saved!</h3>
+                <h3 className="text-lg font-black text-slate-900">
+                  {successPayment?.amount === 0 ? "Subscription Activated!" : "Payment Verified & Saved!"}
+                </h3>
                 <p className="text-xs text-slate-500 font-medium">Invoice ID: <strong className="font-mono text-cyan-600">{successPayment.invoice_id}</strong></p>
               </div>
 
@@ -1577,8 +1596,10 @@ function RecordPaymentContent() {
                   <span className="text-slate-900">{successPayment.member_name}</span>
                 </div>
                 <div className="flex justify-between text-slate-600 font-bold">
-                  <span>Amount Paid Today:</span>
-                  <span className="text-emerald-600 font-mono text-sm font-black">₹{successPayment.amount}</span>
+                  <span>{successPayment?.amount === 0 ? "Dues Pending:" : "Amount Paid Today:"}</span>
+                  <span className={`font-mono text-sm font-black ${successPayment?.amount === 0 ? "text-amber-600" : "text-emerald-600"}`}>
+                    {successPayment?.amount === 0 ? `₹${selectedMemberObj?.outstanding_dues || "—"}` : `₹${successPayment.amount}`}
+                  </span>
                 </div>
                 <div className="flex justify-between text-slate-600 font-bold">
                   <span>Payment Scheme:</span>
