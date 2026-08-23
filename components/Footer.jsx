@@ -86,10 +86,15 @@ export default function Footer() {
             © {new Date().getFullYear()} MindSpace Library. Founder: Harsh Goyal. All rights reserved.
           </p>
           
-          <div className="font-body text-xs text-white/50 flex items-center justify-center gap-1.5 bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
+          <a
+            href="https://synchad.online"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-body text-xs text-white/50 flex items-center justify-center gap-1.5 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10 hover:border-[#00A8CC]/40 transition-all cursor-pointer group"
+          >
             <span>Developed by</span>
-            <span className="font-bold text-[#00A8CC] tracking-wide">Synchad Tech</span>
-          </div>
+            <span className="font-bold text-[#00A8CC] tracking-wide group-hover:underline">Synchad Tech</span>
+          </a>
 
           <Link
             href="/login"
