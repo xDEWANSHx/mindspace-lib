@@ -22,8 +22,8 @@ function InvoicePrintContent() {
     async function load() {
       setLoading(true);
       const [pList, mList] = await Promise.all([
-        fetchPayments("main_branch"),
-        fetchMembers("main_branch")
+        fetchPayments("ALL"),
+        fetchMembers("ALL")
       ]);
 
       let foundPayment = null;
@@ -36,7 +36,15 @@ function InvoicePrintContent() {
 
       if (foundPayment) {
         setPayment(foundPayment);
-        const foundMem = mList.find(m => m.id === foundPayment.member_id || m.full_name === foundPayment.member_name);
+        let foundMem = mList.find(m => m.id === foundPayment.member_id);
+        if (!foundMem && foundPayment.member_name) {
+          const pName = foundPayment.member_name.trim().toLowerCase();
+          foundMem = mList.find(m => m.full_name && m.full_name.trim().toLowerCase() === pName);
+        }
+        if (!foundMem && (foundPayment.mobile || foundPayment.phone)) {
+          const pMob = String(foundPayment.mobile || foundPayment.phone).replace(/\D/g, '');
+          if (pMob) foundMem = mList.find(m => m.mobile && String(m.mobile).replace(/\D/g, '') === pMob);
+        }
         setMember(foundMem || null);
       }
       setLoading(false);
@@ -78,24 +86,48 @@ function InvoicePrintContent() {
   
   // Formatted dates
   const rawPaidAt = payment.paid_at || payment.created_at;
-  const receiptDate = rawPaidAt ? rawPaidAt.substring(0, 10).split('-').reverse().join('/') : formatDate(new Date()).split('-').reverse().join('/');
+  const receiptDate = rawPaidAt ? String(rawPaidAt).substring(0, 10).split('-').reverse().join('/') : formatDate(new Date()).split('-').reverse().join('/');
   
   const studentAllotmentNo = member?.permanent_id || `#MS26B${Date.now().toString().slice(-2)}`;
   const studentName = (payment.member_name || member?.full_name || "STUDENT").toUpperCase();
   const libraryId = member?.student_no || member?.permanent_id || "MSB154";
-  const mobileNo = member?.mobile || "";
+  const mobileNo = member?.mobile || payment?.mobile || "";
   const shiftName = member?.shift || "Full Day";
   const seatNo = member?.seat_no || "Unassigned";
-  const joiningDate = member?.joining_date ? member.joining_date.split('-').reverse().join('/') : receiptDate;
-  const endDate = member?.subscription_end_date ? member.subscription_end_date.split('-').reverse().join('/') : "N/A";
 
-  // Subscription Start = payment date or joining date (formatted DD/MM/YYYY)
-  const rawSubStart = payment?.paid_at || payment?.created_at || member?.joining_date;
-  let subscriptionStartDate = joiningDate;
-  if (rawSubStart) {
-    const cleanStr = String(rawSubStart).substring(0, 10);
-    subscriptionStartDate = cleanStr.split('-').reverse().join('/');
+  // Joining Date: Member's initial lifetime admission date
+  const rawJoining = member?.joining_date;
+  const joiningDate = rawJoining ? String(rawJoining).substring(0, 10).split('-').reverse().join('/') : receiptDate;
+
+  // Subscription Start Date for THIS transaction invoice
+  const rawSubStartStr = payment?.paid_at || payment?.created_at || member?.joining_date;
+  const rawSubStart = rawSubStartStr ? String(rawSubStartStr).substring(0, 10) : formatDate(new Date());
+  const subscriptionStartDate = rawSubStart.split('-').reverse().join('/');
+
+  // Valid Till / Expiry Date for THIS transaction invoice
+  let rawEndDate = "";
+  if (payment?.notes) {
+    const matchExp = payment.notes.match(/(?:Expiry|Valid Till|End Date):\s*(\d{4}-\d{2}-\d{2})/i);
+    if (matchExp && matchExp[1]) {
+      rawEndDate = matchExp[1];
+    }
   }
+
+  if (!rawEndDate && member?.subscription_end_date) {
+    const memEnd = String(member.subscription_end_date).substring(0, 10);
+    const subStartMs = new Date(rawSubStart).getTime();
+    const memEndMs = new Date(memEnd).getTime();
+    const diffDays = Math.round((memEndMs - subStartMs) / (1000 * 60 * 60 * 24));
+    if (diffDays >= 25) {
+      rawEndDate = memEnd;
+    }
+  }
+
+  if (!rawEndDate) {
+    rawEndDate = addOneMonth(rawSubStart);
+  }
+
+  const endDate = rawEndDate.split('-').reverse().join('/');
   const startDate = joiningDate; // kept for compatibility
 
   const paidAmount = parseFloat(payment.amount || 0);
