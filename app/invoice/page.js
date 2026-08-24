@@ -8,10 +8,13 @@ import { Printer, Download, Share2, ArrowLeft, ShieldCheck, Calendar, Clock } fr
 import Link from "next/link";
 import Image from "next/image";
 
+import { supabase } from "@/lib/supabase";
+
 function InvoicePrintContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const invoiceId = searchParams.get("id");
+  const rawId = searchParams.get("id") || searchParams.get("invoice_id") || searchParams.get("invoiceId") || searchParams.get("invoice") || searchParams.get("receipt");
+  const invoiceId = rawId ? String(rawId).trim() : null;
 
   const [payment, setPayment] = useState(null);
   const [member, setMember] = useState(null);
@@ -27,9 +30,34 @@ function InvoicePrintContent() {
       ]);
 
       let foundPayment = null;
-      if (invoiceId) {
-        foundPayment = pList.find(p => p.invoice_id === invoiceId || p.id === invoiceId);
+
+      // 1. Try fuzzy matching in pre-fetched pList
+      if (invoiceId && pList.length > 0) {
+        const cleanQ = invoiceId.toLowerCase();
+        foundPayment = pList.find(p => {
+          const invId = p.invoice_id ? String(p.invoice_id).trim().toLowerCase() : "";
+          const pId = p.id ? String(p.id).trim().toLowerCase() : "";
+          return invId === cleanQ || pId === cleanQ || invId.includes(cleanQ) || cleanQ.includes(invId);
+        });
       }
+
+      // 2. Direct Supabase query fallback if not matched in pList
+      if (invoiceId && !foundPayment) {
+        try {
+          const { data: dbMatch } = await supabase
+            .from('payments')
+            .select('*')
+            .or(`invoice_id.ilike.%${invoiceId}%,id.eq.${invoiceId}`)
+            .limit(1);
+          if (dbMatch && dbMatch.length > 0) {
+            foundPayment = dbMatch[0];
+          }
+        } catch (e) {
+          console.error("Supabase direct payment lookup error:", e);
+        }
+      }
+
+      // 3. Fallback to latest payment if no specific ID or no match
       if (!foundPayment && pList.length > 0) {
         foundPayment = pList[0];
       }
@@ -45,6 +73,21 @@ function InvoicePrintContent() {
           const pMob = String(foundPayment.mobile || foundPayment.phone).replace(/\D/g, '');
           if (pMob) foundMem = mList.find(m => m.mobile && String(m.mobile).replace(/\D/g, '') === pMob);
         }
+
+        // Direct DB member lookup fallback
+        if (!foundMem) {
+          try {
+            if (foundPayment.member_id) {
+              const { data: dbMem } = await supabase.from('members').select('*').eq('id', foundPayment.member_id).single();
+              if (dbMem) foundMem = dbMem;
+            }
+            if (!foundMem && foundPayment.member_name) {
+              const { data: dbMemList } = await supabase.from('members').select('*').ilike('full_name', `%${foundPayment.member_name.trim()}%`).limit(1);
+              if (dbMemList && dbMemList.length > 0) foundMem = dbMemList[0];
+            }
+          } catch (e) {}
+        }
+
         setMember(foundMem || null);
       }
       setLoading(false);
