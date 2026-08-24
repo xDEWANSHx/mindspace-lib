@@ -44,11 +44,15 @@ function InvoicePrintContent() {
       // 2. Direct Supabase query fallback if not matched in pList
       if (invoiceId && !foundPayment) {
         try {
-          const { data: dbMatch } = await supabase
-            .from('payments')
-            .select('*')
-            .or(`invoice_id.ilike.%${invoiceId}%,id.eq.${invoiceId}`)
-            .limit(1);
+          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(invoiceId);
+          let dbMatch = null;
+          if (isUUID) {
+            const { data } = await supabase.from('payments').select('*').eq('id', invoiceId).limit(1);
+            dbMatch = data;
+          } else {
+            const { data } = await supabase.from('payments').select('*').ilike('invoice_id', `%${invoiceId}%`).limit(1);
+            dbMatch = data;
+          }
           if (dbMatch && dbMatch.length > 0) {
             foundPayment = dbMatch[0];
           }
