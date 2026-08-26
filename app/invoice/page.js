@@ -147,7 +147,7 @@ function InvoicePrintContent() {
   const joiningDate = rawJoining ? String(rawJoining).substring(0, 10).split('-').reverse().join('/') : receiptDate;
 
   // Subscription Start Date for THIS transaction invoice
-  const rawSubStartStr = payment?.paid_at || payment?.created_at || member?.joining_date;
+  const rawSubStartStr = payment?.start_date || payment?.paid_at || payment?.created_at || member?.joining_date;
   const rawSubStart = rawSubStartStr ? String(rawSubStartStr).substring(0, 10) : formatDate(new Date());
   const subscriptionStartDate = rawSubStart.split('-').reverse().join('/');
 

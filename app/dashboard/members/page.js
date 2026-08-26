@@ -698,7 +698,7 @@ export default function MembersDirectoryPage() {
                   <div><span className="text-slate-400 font-medium block">Sub. Start (Current):</span> <p className="font-mono font-bold text-indigo-600">{(() => {
                     const memPayments = payments.filter(p => p.member_id === selectedMember.id);
                     const latestPayment = memPayments.length > 0 ? memPayments[0] : null;
-                    return latestPayment?.paid_at ? latestPayment.paid_at.substring(0, 10) : (selectedMember.joining_date || "N/A");
+                    return latestPayment?.start_date ? latestPayment.start_date.substring(0, 10) : (selectedMember.joining_date || "N/A");
                   })()}</p></div>
                   <div><span className="text-slate-400 font-medium block">Subscription End:</span> <p className="font-mono font-bold text-emerald-600">{selectedMember.subscription_end_date}</p></div>
                   <div><span className="text-slate-400 font-medium block">Duration:</span> <p className="font-mono font-bold text-slate-700">1 Month</p></div>
