@@ -930,7 +930,7 @@ function RecordPaymentContent() {
                     <div>
                       <label className="text-slate-700 font-extrabold text-xs mb-1 flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-cyan-600" />
-                        <span>PLAN START DATE</span>
+                        <span>SUBSCRIPTION START DATE</span>
                       </label>
                       <input
                         type="date"

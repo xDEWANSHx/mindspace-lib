@@ -484,8 +484,8 @@ function InvoicePrintContent() {
               <p>Shift: <span className="font-bold text-slate-900">{shiftName}</span></p>
               <p>Seat No: <span className="font-bold text-indigo-700 font-mono text-sm">{seatNo}</span></p>
               <p>Locker Facility: <span className={`font-bold font-mono ${member?.has_locker ? "text-emerald-700 font-extrabold" : "text-slate-500"}`}>{member?.has_locker ? `Assigned (${member?.locker_no || 'Standard Locker'})` : 'No Locker Assigned'}</span></p>
-              <p>Joining Date: <span className="font-bold text-slate-900 font-mono">{joiningDate}</span></p>
-              <p>Subscription Start: <span className="font-bold text-indigo-700 font-mono">{subscriptionStartDate}</span></p>
+              <p>Initial Admission Date: <span className="font-bold text-slate-900 font-mono">{joiningDate}</span></p>
+              <p>Subscription Start Date: <span className="font-bold text-indigo-700 font-mono">{subscriptionStartDate}</span></p>
               <p>Valid Till: <span className="font-bold text-slate-900 font-mono">{endDate}</span></p>
               <p>Duration: <span className="font-bold text-slate-900 font-mono">1 Month</span></p>
             </div>

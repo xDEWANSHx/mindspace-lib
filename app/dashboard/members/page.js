@@ -211,6 +211,10 @@ export default function MembersDirectoryPage() {
 
   // Action: Open Edit Modal with ALL FIELDS initialized
   const openEditModal = (m) => {
+    const memPayments = payments.filter(p => p.member_id === m.id);
+    const latestP = memPayments.length > 0 ? memPayments[0] : null;
+    const currentSubStart = latestP?.start_date ? latestP.start_date.substring(0, 10) : (latestP?.paid_at ? latestP.paid_at.substring(0, 10) : m.joining_date);
+
     setEditData({
       full_name: m.full_name || "",
       student_no: m.student_no || "",
@@ -224,7 +228,8 @@ export default function MembersDirectoryPage() {
       shift: m.shift || "Full Day",
       seat_no: m.seat_no || "",
       joining_date: m.joining_date || "",
-      subscription_end_date: m.subscription_end_date || "",
+      sub_start_date: currentSubStart || m.joining_date || "",
+      subscription_end_date: m.subscription_end_date || (currentSubStart ? addOneMonth(currentSubStart) : ""),
       plan_amount: m.plan_amount !== undefined ? m.plan_amount : 1100,
       outstanding_dues: m.outstanding_dues || 0,
       pay_later: m.pay_later || false,
@@ -245,6 +250,8 @@ export default function MembersDirectoryPage() {
     if (editData.shift === "Full Day" && (finalPlanAmt === 600 || !editData.plan_amount)) {
       finalPlanAmt = 1100;
     }
+    const finalSubEnd = editData.subscription_end_date || (editData.sub_start_date ? addOneMonth(editData.sub_start_date) : selectedMember.subscription_end_date);
+
     const updates = {
       full_name: editData.full_name,
       student_no: editData.student_no,
@@ -258,7 +265,7 @@ export default function MembersDirectoryPage() {
       shift: editData.shift,
       seat_no: editData.seat_no ? editData.seat_no : null,
       joining_date: editData.joining_date,
-      subscription_end_date: editData.subscription_end_date,
+      subscription_end_date: finalSubEnd,
       plan_amount: finalPlanAmt,
       outstanding_dues: parseFloat(editData.outstanding_dues || 0),
       due_date: editData.due_date ? editData.due_date : null,
@@ -269,6 +276,15 @@ export default function MembersDirectoryPage() {
     };
 
     await updateMember(selectedMember.id, updates, 'Admin', selectedMember);
+
+    // Sync latest payment's start_date if edited
+    const memPayments = payments.filter(p => p.member_id === selectedMember.id);
+    if (memPayments.length > 0 && editData.sub_start_date) {
+      const latestP = memPayments[0];
+      try {
+        await supabase.from('payments').update({ start_date: editData.sub_start_date }).eq('id', latestP.id);
+      } catch (err) {}
+    }
 
     setEditProfileModalOpen(false);
     await reloadData();
@@ -706,16 +722,8 @@ export default function MembersDirectoryPage() {
                   <div><span className="text-slate-400 font-medium block">Shift Plan:</span> <p className="font-bold text-slate-800">{selectedMember.shift}</p></div>
                   <div><span className="text-slate-400 font-medium block">Assigned Seat:</span> <p className="font-mono font-bold text-cyan-700">{selectedMember.seat_no || "Unassigned"}</p></div>
                   <div><span className="text-slate-400 font-medium block">Locker Assigned:</span> <p className="font-mono font-bold text-purple-700">{selectedMember.has_locker ? (selectedMember.locker_no || "Yes") : "No Locker"}</p></div>
-                  <div><span className="text-slate-400 font-medium block">Joining Date:</span> <p className="font-mono font-bold text-slate-700">{(() => {
-                    const memPayments = payments.filter(p => p.member_id === selectedMember.id);
-                    if (memPayments.length > 0) {
-                      const firstPayment = memPayments[memPayments.length - 1];
-                      const firstDate = firstPayment.start_date ? firstPayment.start_date.substring(0, 10) : (firstPayment.paid_at ? firstPayment.paid_at.substring(0, 10) : null);
-                      if (firstDate) return firstDate;
-                    }
-                    return selectedMember.joining_date || "N/A";
-                  })()}</p></div>
-                  <div><span className="text-slate-400 font-medium block">Sub. Start (Current):</span> <p className="font-mono font-bold text-indigo-600">{(() => {
+                  <div><span className="text-slate-400 font-medium block">Initial Admission Date:</span> <p className="font-mono font-bold text-slate-700">{selectedMember.joining_date || "N/A"}</p></div>
+                  <div><span className="text-slate-400 font-medium block">Subscription Start Date:</span> <p className="font-mono font-bold text-indigo-600">{(() => {
                     const memPayments = payments.filter(p => p.member_id === selectedMember.id);
                     if (memPayments.length > 0) {
                       const latestPayment = memPayments[0];
@@ -724,7 +732,7 @@ export default function MembersDirectoryPage() {
                     }
                     return selectedMember.joining_date || "N/A";
                   })()}</p></div>
-                  <div><span className="text-slate-400 font-medium block">Subscription End:</span> <p className="font-mono font-bold text-emerald-600">{(() => {
+                  <div><span className="text-slate-400 font-medium block">Subscription Expiry Date:</span> <p className="font-mono font-bold text-emerald-600">{(() => {
                     const memPayments = payments.filter(p => p.member_id === selectedMember.id);
                     const latestPayment = memPayments.length > 0 ? memPayments[0] : null;
                     const subStart = latestPayment?.start_date ? latestPayment.start_date.substring(0, 10) : (latestPayment?.paid_at ? latestPayment.paid_at.substring(0, 10) : selectedMember.joining_date);
@@ -968,22 +976,39 @@ export default function MembersDirectoryPage() {
                 </div>
 
                 <div>
-                  <label className="text-slate-500 font-bold mb-1 block">Joining Date</label>
+                  <label className="text-slate-600 font-bold mb-1 block">Initial Admission Date</label>
                   <input
                     type="date"
                     value={editData.joining_date}
                     onChange={(e) => setEditData({ ...editData, joining_date: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none font-mono font-bold"
                   />
                 </div>
 
                 <div>
-                  <label className="text-slate-500 font-bold mb-1 block">Subscription Expiry Date</label>
+                  <label className="text-indigo-800 font-extrabold mb-1 block">Subscription Start Date (Current Cycle)</label>
+                  <input
+                    type="date"
+                    value={editData.sub_start_date}
+                    onChange={(e) => {
+                      const newStart = e.target.value;
+                      setEditData({
+                        ...editData,
+                        sub_start_date: newStart,
+                        subscription_end_date: newStart ? addOneMonth(newStart) : editData.subscription_end_date
+                      });
+                    }}
+                    className="w-full bg-indigo-50/70 border border-indigo-200 rounded-2xl p-3 text-indigo-950 font-mono font-black outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-emerald-800 font-extrabold mb-1 block">Subscription Expiry Date (Valid Till)</label>
                   <input
                     type="date"
                     value={editData.subscription_end_date}
                     onChange={(e) => setEditData({ ...editData, subscription_end_date: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none font-mono"
+                    className="w-full bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3 text-emerald-950 font-mono font-black outline-none focus:border-emerald-500"
                   />
                 </div>
 
