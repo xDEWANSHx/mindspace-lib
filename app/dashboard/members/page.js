@@ -889,7 +889,21 @@ export default function MembersDirectoryPage() {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setEditData({ ...editData, has_locker: !editData.has_locker })}
+                        onClick={() => {
+                          const nextLocker = !editData.has_locker;
+                          const basePrice = editData.shift === "Full Day" ? 1100 : 600;
+                          const newPlanAmt = nextLocker ? (basePrice + 50) : basePrice;
+                          let newDues = parseFloat(editData.outstanding_dues || 0);
+                          if (newDues > newPlanAmt || newDues === parseFloat(editData.plan_amount || 0)) {
+                            newDues = newPlanAmt;
+                          }
+                          setEditData({
+                            ...editData,
+                            has_locker: nextLocker,
+                            plan_amount: newPlanAmt,
+                            outstanding_dues: newDues
+                          });
+                        }}
                         className={`px-4 py-1.5 rounded-full text-xs font-black transition-all ${
                           editData.has_locker ? "bg-purple-600 text-white shadow-md" : "bg-slate-200 text-slate-600"
                         }`}
