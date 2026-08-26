@@ -139,43 +139,31 @@ function InvoicePrintContent() {
   const receiptDate = rawPaidAt ? String(rawPaidAt).substring(0, 10).split('-').reverse().join('/') : formatDate(new Date()).split('-').reverse().join('/');
   
   const studentAllotmentNo = member?.permanent_id || `#MS26B${Date.now().toString().slice(-2)}`;
-  const studentName = (payment.member_name || member?.full_name || "STUDENT").toUpperCase();
-  const libraryId = member?.student_no || member?.permanent_id || "MSB154";
+  const studentName = (member?.full_name || payment?.member_name || "STUDENT").toUpperCase();
+  const libraryId = member?.permanent_id || member?.student_no || "MSB154";
   const mobileNo = member?.mobile || payment?.mobile || "";
-  const shiftName = member?.shift || "Full Day";
+  const shiftName = member?.shift || payment?.shift || "Full Day";
   const seatNo = member?.seat_no || "Unassigned";
 
-  // Joining Date: Member's initial lifetime admission date
+  // Joining Date: Member's initial lifetime admission date (from Student Directory)
   const rawJoining = member?.joining_date;
-  const joiningDate = rawJoining ? String(rawJoining).substring(0, 10).split('-').reverse().join('/') : receiptDate;
+  const joiningDate = rawJoining
+    ? String(rawJoining).substring(0, 10).split('-').reverse().join('/')
+    : (payment?.start_date ? String(payment.start_date).substring(0, 10).split('-').reverse().join('/') : receiptDate);
 
   // Subscription Start Date for THIS transaction invoice
-  let rawSubStartStr = payment?.start_date || payment?.paid_at || payment?.created_at || member?.joining_date;
-  if (rawJoining && rawSubStartStr && rawSubStartStr.substring(0, 10) < String(rawJoining).substring(0, 10)) {
-    rawSubStartStr = rawJoining;
-  }
+  const rawSubStartStr = payment?.start_date || payment?.paid_at || payment?.created_at || member?.joining_date;
   const rawSubStart = rawSubStartStr ? String(rawSubStartStr).substring(0, 10) : formatDate(new Date());
   const subscriptionStartDate = rawSubStart.split('-').reverse().join('/');
 
-  // Valid Till / Expiry Date for THIS transaction invoice
-  let rawEndDate = "";
-  if (payment?.notes) {
+  // Valid Till / Expiry Date: prioritize member's subscription_end_date from Student Directory
+  let rawEndDate = member?.subscription_end_date ? String(member.subscription_end_date).substring(0, 10) : "";
+  if (!rawEndDate && payment?.notes) {
     const matchExp = payment.notes.match(/(?:Expiry|Valid Till|End Date):\s*(\d{4}-\d{2}-\d{2})/i);
     if (matchExp && matchExp[1]) {
       rawEndDate = matchExp[1];
     }
   }
-
-  if (!rawEndDate && member?.subscription_end_date) {
-    const memEnd = String(member.subscription_end_date).substring(0, 10);
-    const subStartMs = new Date(rawSubStart).getTime();
-    const memEndMs = new Date(memEnd).getTime();
-    const diffDays = Math.round((memEndMs - subStartMs) / (1000 * 60 * 60 * 24));
-    if (diffDays >= 25) {
-      rawEndDate = memEnd;
-    }
-  }
-
   if (!rawEndDate) {
     rawEndDate = addOneMonth(rawSubStart);
   }
@@ -190,10 +178,12 @@ function InvoicePrintContent() {
   // PAY_LATER: subscription activated but ₹0 collected
   const isPayLater = paidAmount === 0 && outstandingDues > 0;
 
-  // Locker Details for Invoice
-  const hasLocker = payment?.has_locker !== undefined && payment?.has_locker !== null
-    ? !!payment.has_locker
-    : !!(member?.has_locker || (payment?.notes && payment.notes.toLowerCase().includes("locker")));
+  // Locker Details for Invoice: prioritize Student Directory (member.has_locker)
+  const hasLocker = member
+    ? !!member.has_locker
+    : (payment?.has_locker !== undefined && payment?.has_locker !== null
+        ? !!payment.has_locker
+        : !!(payment?.notes && payment.notes.toLowerCase().includes("locker")));
   const lockerNo = member?.locker_no || payment?.locker_no || "Standard Locker";
   const lockerFee = hasLocker ? 50 : 0;
   const seatPlanAmount = hasLocker ? Math.max(0, planAmount - lockerFee) : planAmount;
