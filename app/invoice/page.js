@@ -178,15 +178,17 @@ function InvoicePrintContent() {
   const startDate = joiningDate; // kept for compatibility
 
   const paidAmount = parseFloat(payment.amount || 0);
-  const planAmount = parseFloat(member?.plan_amount || paidAmount);
-  const outstandingDues = parseFloat(member?.outstanding_dues || 0);
+  const planAmount = parseFloat(member?.plan_amount || payment?.plan_amount || (paidAmount + (payment.outstanding_dues || member?.outstanding_dues || 0)));
+  const outstandingDues = parseFloat(member?.outstanding_dues !== undefined ? member.outstanding_dues : (payment?.outstanding_dues || 0));
   const isFullySettled = outstandingDues === 0;
   // PAY_LATER: subscription activated but ₹0 collected
   const isPayLater = paidAmount === 0 && outstandingDues > 0;
 
   // Locker Details for Invoice
-  const hasLocker = !!(member?.has_locker || payment?.notes?.toLowerCase().includes("locker"));
-  const lockerNo = member?.locker_no || "Assigned Locker";
+  const hasLocker = payment?.has_locker !== undefined && payment?.has_locker !== null
+    ? !!payment.has_locker
+    : !!(member?.has_locker || (payment?.notes && payment.notes.toLowerCase().includes("locker")));
+  const lockerNo = member?.locker_no || payment?.locker_no || "Standard Locker";
   const lockerFee = hasLocker ? 50 : 0;
   const seatPlanAmount = hasLocker ? Math.max(0, planAmount - lockerFee) : planAmount;
 
@@ -658,7 +660,7 @@ function InvoicePrintContent() {
             )}
             <div className="flex justify-between py-2 text-base font-black text-[#0F172A] border-t-2 border-slate-900">
               <span className="uppercase tracking-wider">GRAND TOTAL</span>
-              <span className="font-mono">₹{paidAmount.toLocaleString()}.00</span>
+              <span className="font-mono">₹{planAmount.toLocaleString()}.00</span>
             </div>
           </div>
         </div>
