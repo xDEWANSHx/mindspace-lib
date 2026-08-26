@@ -923,12 +923,12 @@ function RecordPaymentContent() {
                   </div>
                 </div>
 
-                {/* PLAN START DATE, INTERVAL DAYS & EDITABLE EXPIRY DATE */}
+                {/* PLAN START DATE & EDITABLE EXPIRY DATE */}
                 <div className="bg-slate-100/90 p-4 rounded-2xl border border-slate-200 space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {/* 1. Plan Start Date */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* 1. Subscription Start Date */}
                     <div>
-                      <label className="text-slate-700 font-extrabold text-xs mb-1 block flex items-center gap-1.5">
+                      <label className="text-slate-700 font-extrabold text-xs mb-1 flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-cyan-600" />
                         <span>PLAN START DATE</span>
                       </label>
@@ -943,46 +943,7 @@ function RecordPaymentContent() {
                       />
                     </div>
 
-                    {/* 2. Default Days Interval Selector */}
-                    <div>
-                      <label className="text-slate-700 font-extrabold text-xs mb-1 block flex items-center gap-1.5">
-                        <Zap className="w-3.5 h-3.5 text-amber-600" />
-                        <span>INTERVAL DAYS</span>
-                      </label>
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="number"
-                          value={extendDays}
-                          onChange={(e) => {
-                            const d = parseInt(e.target.value) || 30;
-                            setExtendDays(d);
-                            setOverrideExpiryDate("");
-                          }}
-                          className="w-16 bg-white border border-slate-300 rounded-xl p-2 text-xs font-black text-slate-900 font-mono text-center outline-none focus:border-amber-600"
-                        />
-                        <div className="flex gap-1">
-                          {[30, 28, 31].map(days => (
-                            <button
-                              key={days}
-                              type="button"
-                              onClick={() => {
-                                setExtendDays(days);
-                                setOverrideExpiryDate("");
-                              }}
-                              className={`px-2 py-1.5 rounded-lg text-[10px] font-extrabold border transition-all cursor-pointer ${
-                                extendDays === days
-                                  ? "bg-slate-900 text-white border-slate-900 shadow-sm"
-                                  : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
-                              }`}
-                            >
-                              {days}d
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 3. Editable Expiry Date */}
+                    {/* 2. Editable Expiry Date */}
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="text-slate-700 font-extrabold text-xs flex items-center gap-1.5">
@@ -1013,7 +974,7 @@ function RecordPaymentContent() {
                   </div>
                   <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 pt-1 border-t border-slate-200/60">
                     <span>
-                      {overrideExpiryDate ? "✏️ Custom Date Set Manually" : `✨ Auto-calculated (+${extendDays} Days Interval)`}
+                      {overrideExpiryDate ? "✏️ Custom Expiry Date Set Manually" : "✨ Auto-calculated (Month-to-Month Cycle)"}
                     </span>
                     <span className="font-mono text-cyan-800 font-extrabold">
                       Active Period: {joiningDate} → {finalExpiryDate}

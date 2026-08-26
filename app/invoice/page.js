@@ -132,11 +132,10 @@ function InvoicePrintContent() {
   const receiptNo = payment.invoice_id || `REC-B-${Date.now().toString().slice(-5)}`;
   
   // Formatted dates
-  let rawPaidAt = payment.paid_at || payment.created_at;
-  if (member?.joining_date && rawPaidAt && String(rawPaidAt).substring(0, 10) < String(member.joining_date).substring(0, 10)) {
-    rawPaidAt = member.joining_date;
-  }
-  const receiptDate = rawPaidAt ? String(rawPaidAt).substring(0, 10).split('-').reverse().join('/') : formatDate(new Date()).split('-').reverse().join('/');
+  let rawPaidAt = payment.paid_at || payment.created_at || member?.joining_date;
+  const receiptDate = rawPaidAt
+    ? String(rawPaidAt).substring(0, 10).split('-').reverse().join('/')
+    : (member?.joining_date ? String(member.joining_date).substring(0, 10).split('-').reverse().join('/') : "N/A");
   
   const studentAllotmentNo = member?.permanent_id || `#MS26B${Date.now().toString().slice(-2)}`;
   const studentName = (member?.full_name || payment?.member_name || "STUDENT").toUpperCase();
@@ -146,30 +145,24 @@ function InvoicePrintContent() {
   const seatNo = member?.seat_no || "Unassigned";
 
   // Joining Date: Member's initial lifetime admission date (from Student Directory)
-  const rawJoining = member?.joining_date;
-  const joiningDate = rawJoining
-    ? String(rawJoining).substring(0, 10).split('-').reverse().join('/')
-    : (payment?.start_date ? String(payment.start_date).substring(0, 10).split('-').reverse().join('/') : receiptDate);
+  const rawJoining = member?.joining_date || payment?.start_date || payment?.paid_at || payment?.created_at;
+  const joiningDate = rawJoining ? String(rawJoining).substring(0, 10).split('-').reverse().join('/') : "N/A";
 
   // Subscription Start Date for THIS transaction invoice
   const rawSubStartStr = payment?.start_date || payment?.paid_at || payment?.created_at || member?.joining_date;
-  const rawSubStart = rawSubStartStr ? String(rawSubStartStr).substring(0, 10) : formatDate(new Date());
-  const subscriptionStartDate = rawSubStart.split('-').reverse().join('/');
+  const rawSubStart = rawSubStartStr ? String(rawSubStartStr).substring(0, 10) : (rawJoining ? String(rawJoining).substring(0, 10) : "");
+  const subscriptionStartDate = rawSubStart ? rawSubStart.split('-').reverse().join('/') : joiningDate;
 
-  // Valid Till / Expiry Date: prioritize member's subscription_end_date from Student Directory
-  let rawEndDate = member?.subscription_end_date ? String(member.subscription_end_date).substring(0, 10) : "";
-  if (!rawEndDate && payment?.notes) {
-    const matchExp = payment.notes.match(/(?:Expiry|Valid Till|End Date):\s*(\d{4}-\d{2}-\d{2})/i);
-    if (matchExp && matchExp[1]) {
-      rawEndDate = matchExp[1];
-    }
-  }
-  if (!rawEndDate) {
+  // Valid Till / Expiry Date: Always calculate month-to-month cycle from Subscription Start Date
+  let rawEndDate = payment?.end_date ? String(payment.end_date).substring(0, 10) : "";
+  if (!rawEndDate && rawSubStart) {
     rawEndDate = addOneMonth(rawSubStart);
+  } else if (!rawEndDate && member?.subscription_end_date) {
+    rawEndDate = String(member.subscription_end_date).substring(0, 10);
   }
 
-  const endDate = rawEndDate.split('-').reverse().join('/');
-  const startDate = joiningDate; // kept for compatibility
+  const endDate = rawEndDate ? rawEndDate.split('-').reverse().join('/') : "N/A";
+  const startDate = subscriptionStartDate;
 
   const paidAmount = parseFloat(payment.amount || 0);
   const planAmount = parseFloat(member?.plan_amount || payment?.plan_amount || (paidAmount + (payment.outstanding_dues || member?.outstanding_dues || 0)));

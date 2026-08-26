@@ -724,7 +724,13 @@ export default function MembersDirectoryPage() {
                     }
                     return selectedMember.joining_date || "N/A";
                   })()}</p></div>
-                  <div><span className="text-slate-400 font-medium block">Subscription End:</span> <p className="font-mono font-bold text-emerald-600">{selectedMember.subscription_end_date}</p></div>
+                  <div><span className="text-slate-400 font-medium block">Subscription End:</span> <p className="font-mono font-bold text-emerald-600">{(() => {
+                    const memPayments = payments.filter(p => p.member_id === selectedMember.id);
+                    const latestPayment = memPayments.length > 0 ? memPayments[0] : null;
+                    const subStart = latestPayment?.start_date ? latestPayment.start_date.substring(0, 10) : (latestPayment?.paid_at ? latestPayment.paid_at.substring(0, 10) : selectedMember.joining_date);
+                    if (subStart) return addOneMonth(subStart);
+                    return selectedMember.subscription_end_date || "N/A";
+                  })()}</p></div>
                   <div><span className="text-slate-400 font-medium block">Duration:</span> <p className="font-mono font-bold text-slate-700">1 Month</p></div>
                   <div><span className="text-slate-400 font-medium block">Outstanding Dues:</span> <p className="font-mono font-bold text-amber-600">₹{selectedMember.outstanding_dues || 0}</p></div>
                   {selectedMember.outstanding_dues > 0 && (
