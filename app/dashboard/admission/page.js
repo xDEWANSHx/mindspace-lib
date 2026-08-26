@@ -507,7 +507,7 @@ export default function NewAdmissionPage() {
           has_locker: formData.has_locker,
           locker_no: null,
           joining_date: formData.joining_date,
-          subscription_end_date: calculatedEndDate(),
+          subscription_end_date: null,
           plan_amount: finalAmount,
           outstanding_dues: finalAmount,
           payment_status: 'PAY_LATER',
@@ -1007,6 +1007,18 @@ export default function NewAdmissionPage() {
                     onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                     placeholder="e.g. Ankit Sharma"
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none focus:border-cyan-500 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-700 font-extrabold mb-1 block">
+                    Initial Admission Date <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.joining_date}
+                    onChange={(e) => setFormData({ ...formData, joining_date: e.target.value })}
+                    className="w-full bg-cyan-50/50 border border-cyan-300 rounded-2xl p-3 text-slate-900 font-mono font-bold outline-none focus:border-cyan-600"
                   />
                 </div>
                 <div>

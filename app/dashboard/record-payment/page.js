@@ -33,7 +33,9 @@ import {
   updateMember,
   formatDate,
   addOneMonth,
-  addDaysToDate
+  subtractOneMonth,
+  addDaysToDate,
+  getMemberSubscriptionDates
 } from "@/lib/adminService";
 import { formatWhatsAppMessage, openWhatsAppDirectMessage } from "@/lib/whatsappTemplates";
 
@@ -228,23 +230,30 @@ function RecordPaymentContent() {
   const [joiningDate, setJoiningDate] = useState(formatDate(new Date()));
   const [overrideExpiryDate, setOverrideExpiryDate] = useState("");
 
+  const getDefaultSubStartDate = (m) => {
+    if (!m) return paidDate || formatDate(new Date());
+    const hasValidSub = m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970");
+    if (hasValidSub) {
+      return addDaysToDate(m.subscription_end_date, 1);
+    }
+    return m.joining_date || paidDate || formatDate(new Date());
+  };
+
   // Auto-sync locker/date state when student selected (Runs ONLY when selectedMemberId changes!)
   useEffect(() => {
     if (selectedMemberObj) {
       setIncludeLocker(!!selectedMemberObj.has_locker);
       setOverrideExpiryDate("");
-      const todayStr = formatDate(new Date());
-      const pDate = paidDate || todayStr;
 
       if (selectedMemberObj.outstanding_dues > 0) {
         setPaymentType("COLLECT_DUES");
         setAmountPaidToday(selectedMemberObj.outstanding_dues);
-        setJoiningDate(pDate);
+        setJoiningDate(selectedMemberObj.joining_date || paidDate || formatDate(new Date()));
       } else {
         setPaymentType("FULL");
         setPlanFee(selectedMemberObj.plan_amount || 1100);
         setAmountPaidToday(selectedMemberObj.plan_amount || 1100);
-        setJoiningDate(pDate);
+        setJoiningDate(getDefaultSubStartDate(selectedMemberObj));
       }
     }
   }, [selectedMemberId]);
@@ -252,9 +261,7 @@ function RecordPaymentContent() {
   // Adjust joining date when switching paymentType
   useEffect(() => {
     if (selectedMemberObj && paymentType !== "COLLECT_DUES") {
-      const todayStr = formatDate(new Date());
-      const pDate = paidDate || todayStr;
-      setJoiningDate(pDate);
+      setJoiningDate(getDefaultSubStartDate(selectedMemberObj));
     }
   }, [paymentType]);
 
@@ -302,7 +309,7 @@ function RecordPaymentContent() {
       is_renewal: payload.isRenewalAction,
       extend_days: payload.extendDays,
       start_date: payload.joiningDate,
-      end_date: payload.isRenewalAction ? payload.finalExpiryDate : selectedMemberObj.subscription_end_date,
+      end_date: payload.finalExpiryDate || addOneMonth(payload.joiningDate),
       new_outstanding_dues: payload.calculatedNewDues,
       dues_due_date: payload.calculatedNewDues > 0 ? payload.promisedDueDate : null,
       has_locker: payload.includeLocker,
@@ -460,17 +467,18 @@ function RecordPaymentContent() {
       setSelectedMemberId(target.id);
       setManagedStudent(target);
       const joinStr = target.joining_date || formatDate(new Date());
-      let subEndStr = target.subscription_end_date || "";
-      if (!subEndStr || subEndStr <= joinStr) {
-        subEndStr = addOneMonth(joinStr);
-      }
+      const dates = getMemberSubscriptionDates(target, payments);
+      const subStartVal = dates.subStart !== "--" ? dates.subStart : "";
+      const subExpiryVal = (target.subscription_end_date && !String(target.subscription_end_date).startsWith("1970")) ? target.subscription_end_date : (dates.subExpiry !== "--" ? dates.subExpiry : "");
+
       setEditFormData({
         full_name: target.full_name || "",
         mobile: target.mobile || "",
         shift: target.shift || "Full Day",
         seat_no: target.seat_no || "",
         joining_date: joinStr,
-        subscription_end_date: subEndStr,
+        sub_start_date: subStartVal,
+        subscription_end_date: subExpiryVal,
         plan_amount: target.plan_amount || 1100,
         outstanding_dues: target.outstanding_dues || 0,
         payment_status: target.outstanding_dues > 0 ? (target.outstanding_dues < (target.plan_amount || 1100) ? "PARTIAL" : "UNPAID") : "PAID"
@@ -491,12 +499,8 @@ function RecordPaymentContent() {
     }
 
     const updatedDues = parseFloat(editFormData.outstanding_dues || 0);
-
-    const joinStr = editFormData.joining_date || formatDate(new Date());
-    let subEndStr = editFormData.subscription_end_date || "";
-    if (!subEndStr || subEndStr <= joinStr) {
-      subEndStr = addOneMonth(joinStr);
-    }
+    const joinStr = editFormData.joining_date || managedStudent.joining_date || formatDate(new Date());
+    const finalSubEnd = editFormData.subscription_end_date || (editFormData.sub_start_date ? addOneMonth(editFormData.sub_start_date) : null);
 
     await updateMember(managedStudent.id, {
       full_name: editFormData.full_name,
@@ -504,11 +508,47 @@ function RecordPaymentContent() {
       shift: editFormData.shift,
       seat_no: editFormData.seat_no ? editFormData.seat_no : null,
       joining_date: joinStr,
-      subscription_end_date: subEndStr,
+      subscription_end_date: finalSubEnd,
       plan_amount: finalPlanAmount,
       outstanding_dues: updatedDues,
       payment_status: updatedDues === 0 ? "PAID" : (updatedDues < finalPlanAmount ? "PARTIAL" : "UNPAID")
     });
+
+    const memPayments = payments.filter(p =>
+      p.member_id === managedStudent.id ||
+      p.member_id === managedStudent.permanent_id ||
+      p.member_id === managedStudent.student_no ||
+      (p.member_name && managedStudent.full_name && p.member_name.trim().toLowerCase() === managedStudent.full_name.trim().toLowerCase())
+    );
+    if (memPayments.length > 0) {
+      memPayments.sort((a, b) => {
+        const tA = a.paid_at ? new Date(a.paid_at).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
+        const tB = b.paid_at ? new Date(b.paid_at).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
+        return tB - tA;
+      });
+      const latestP = memPayments[0];
+      let updatedNotes = latestP.notes || "";
+      if (editFormData.sub_start_date) {
+        if (updatedNotes.includes("Start Date:")) {
+          updatedNotes = updatedNotes.replace(/Start Date:\s*\d{4}-\d{2}-\d{2}/i, `Start Date: ${editFormData.sub_start_date}`);
+        } else {
+          updatedNotes += ` — Start Date: ${editFormData.sub_start_date}`;
+        }
+      }
+      if (finalSubEnd && !String(finalSubEnd).startsWith("1970")) {
+        if (updatedNotes.includes("Expiry:")) {
+          updatedNotes = updatedNotes.replace(/Expiry:\s*\d{4}-\d{2}-\d{2}/i, `Expiry: ${finalSubEnd}`);
+        } else {
+          updatedNotes += `, Expiry: ${finalSubEnd}`;
+        }
+      }
+      try {
+        await supabase.from('payments').update({
+          member_name: editFormData.full_name || latestP.member_name,
+          notes: updatedNotes
+        }).eq('id', latestP.id);
+      } catch (err) {}
+    }
 
     setManageStudentModalOpen(false);
     const [mList, pList] = await Promise.all([
@@ -540,6 +580,7 @@ function RecordPaymentContent() {
 
   // Helper for Student Directory Badge
   const getMemberBadgeInfo = (m) => {
+    if (!m) return { label: "Unknown", color: "bg-slate-100 text-slate-600 border border-slate-200" };
     if (m.status === 'LEFT' || m.left_at || m.is_active === false) {
       return { label: "Left", color: "bg-slate-100 text-slate-600 border border-slate-200" };
     }
@@ -548,9 +589,11 @@ function RecordPaymentContent() {
 
     const dueDateStr = m.due_date || m.dues_due_date;
     let isDueDatePassed = false;
+    let hasDueDate = false;
     if (dueDateStr) {
-      const parts = dueDateStr.split('-').map(Number);
+      const parts = String(dueDateStr).substring(0, 10).split('-').map(Number);
       if (parts.length === 3 && !isNaN(parts[0])) {
+        hasDueDate = true;
         const promisedDate = new Date(parts[0], parts[1] - 1, parts[2]);
         promisedDate.setHours(0, 0, 0, 0);
         if (now > promisedDate) {
@@ -559,25 +602,39 @@ function RecordPaymentContent() {
       }
     }
 
-    const end = m.subscription_end_date ? new Date(m.subscription_end_date) : null;
+    const hasValidSub = m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970");
+    const end = hasValidSub ? new Date(m.subscription_end_date) : null;
     if (end) end.setHours(0, 0, 0, 0);
     const diffDays = end ? Math.ceil((end - now) / (1000 * 60 * 60 * 24)) : 999;
 
-    // 1. Subscription expired or promised due date passed -> RED
-    if (diffDays < 0) {
+    // 1. Paid subscription expired -> RED
+    if (hasValidSub && diffDays < 0) {
       return { label: `Overdue (${Math.abs(diffDays)}d)`, color: "bg-rose-100 text-rose-800 border border-rose-300 font-extrabold" };
     }
     if (m.outstanding_dues > 0 && isDueDatePassed) {
       return { label: `₹${m.outstanding_dues} Overdue`, color: "bg-rose-100 text-rose-800 border border-rose-300 font-extrabold" };
     }
 
-    // 2. Pending dues (promised date in future) -> YELLOW
+    // 2. Unpaid admission dues check (Day 0 = Pending, Day 1+ = Overdue)
     if (m.outstanding_dues > 0) {
+      if (!hasValidSub) {
+        const joinStr = m.joining_date || (m.created_at ? m.created_at.substring(0, 10) : formatDate(now));
+        const jParts = String(joinStr).substring(0, 10).split('-').map(Number);
+        if (jParts.length === 3 && !isNaN(jParts[0])) {
+          const joinDate = new Date(jParts[0], jParts[1] - 1, jParts[2]);
+          joinDate.setHours(0, 0, 0, 0);
+          const daysSince = Math.floor((now - joinDate) / (1000 * 60 * 60 * 24));
+
+          if (daysSince >= 1 && !hasDueDate) {
+            return { label: `Overdue (${daysSince}d)`, color: "bg-rose-100 text-rose-800 border border-rose-300 font-extrabold" };
+          }
+        }
+      }
       return { label: `₹${m.outstanding_dues} Pending`, color: "bg-amber-100 text-amber-900 border border-amber-300 font-extrabold" };
     }
 
     // 3. Due soon -> AMBER
-    if (diffDays >= 0 && diffDays <= 3) {
+    if (hasValidSub && diffDays >= 0 && diffDays <= 3) {
       return { label: `Due Soon (${diffDays}d)`, color: "bg-amber-100 text-amber-800 border border-amber-300 font-extrabold" };
     }
 
@@ -800,7 +857,7 @@ function RecordPaymentContent() {
                   <div className="bg-white/80 backdrop-blur-xs p-3 rounded-2xl border border-slate-200/80 shadow-2xs col-span-2 flex justify-between items-center">
                     <div>
                       <span className="text-[9px] uppercase font-mono font-extrabold text-slate-400 block tracking-wider">EXPIRY / VALID TILL</span>
-                      <span className="text-slate-800 font-mono font-bold text-xs">{selectedMemberObj.subscription_end_date || "Active"}</span>
+                      <span className="text-slate-800 font-mono font-bold text-xs">{(selectedMemberObj.subscription_end_date && !String(selectedMemberObj.subscription_end_date).startsWith("1970")) ? selectedMemberObj.subscription_end_date : "--"}</span>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-[10px] font-black border ${getMemberBadgeInfo(selectedMemberObj).color}`}>
                       {getMemberBadgeInfo(selectedMemberObj).label}
@@ -1664,16 +1721,16 @@ function RecordPaymentContent() {
                 </div>
 
                 <div>
-                  <label className="text-slate-500 font-bold mb-1 block">Admission / Joining Date</label>
+                  <label className="text-indigo-800 font-extrabold mb-1 block">Subscription Start Date</label>
                   <input
                     type="date"
-                    value={editFormData.joining_date}
+                    value={editFormData.sub_start_date || ""}
                     onChange={(e) => {
-                      const newJoin = e.target.value;
-                      const newSubEnd = newJoin ? addOneMonth(newJoin) : editFormData.subscription_end_date;
-                      setEditFormData({ ...editFormData, joining_date: newJoin, subscription_end_date: newSubEnd });
+                      const newStart = e.target.value;
+                      const newSubEnd = newStart ? addOneMonth(newStart) : editFormData.subscription_end_date;
+                      setEditFormData({ ...editFormData, sub_start_date: newStart, subscription_end_date: newSubEnd });
                     }}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-900 font-bold"
+                    className="w-full bg-indigo-50/70 border border-indigo-200 rounded-2xl p-3 text-indigo-950 font-mono font-bold outline-none focus:border-indigo-500"
                   />
                 </div>
 
@@ -1682,7 +1739,14 @@ function RecordPaymentContent() {
                   <input
                     type="date"
                     value={editFormData.subscription_end_date}
-                    onChange={(e) => setEditFormData({ ...editFormData, subscription_end_date: e.target.value })}
+                    onChange={(e) => {
+                      const newEnd = e.target.value;
+                      setEditFormData({
+                        ...editFormData,
+                        subscription_end_date: newEnd,
+                        sub_start_date: newEnd ? subtractOneMonth(newEnd) : editFormData.sub_start_date
+                      });
+                    }}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-900 font-bold font-mono"
                   />
                 </div>

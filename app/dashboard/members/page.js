@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   Trash2,
   RotateCcw,
+  RotateCw,
   Send,
   FileText,
   DollarSign,
@@ -40,7 +41,9 @@ import {
   calculateMemberStatus,
   seedFreshComprehensiveData,
   formatDate,
-  addOneMonth
+  addOneMonth,
+  subtractOneMonth,
+  getMemberSubscriptionDates
 } from "@/lib/adminService";
 import { exportListToPDF } from "@/lib/pdfExport";
 
@@ -223,9 +226,9 @@ export default function MembersDirectoryPage() {
 
   // Action: Open Edit Modal with ALL FIELDS initialized
   const openEditModal = (m) => {
-    const memPayments = getMemberPayments(m);
-    const latestP = memPayments.length > 0 ? memPayments[0] : null;
-    const currentSubStart = latestP?.start_date ? latestP.start_date.substring(0, 10) : (latestP?.paid_at ? latestP.paid_at.substring(0, 10) : m.joining_date);
+    const dates = getMemberSubscriptionDates(m, payments);
+    const subStartVal = dates.subStart !== "--" ? dates.subStart : "";
+    const subExpiryVal = dates.subExpiry !== "--" ? dates.subExpiry : "";
 
     setEditData({
       full_name: m.full_name || "",
@@ -240,8 +243,8 @@ export default function MembersDirectoryPage() {
       shift: m.shift || "Full Day",
       seat_no: m.seat_no || "",
       joining_date: m.joining_date || "",
-      sub_start_date: currentSubStart || m.joining_date || "",
-      subscription_end_date: m.subscription_end_date || (currentSubStart ? addOneMonth(currentSubStart) : ""),
+      sub_start_date: subStartVal,
+      subscription_end_date: subExpiryVal,
       plan_amount: m.plan_amount !== undefined ? m.plan_amount : 1100,
       outstanding_dues: m.outstanding_dues || 0,
       pay_later: m.pay_later || false,
@@ -289,18 +292,87 @@ export default function MembersDirectoryPage() {
 
     await updateMember(selectedMember.id, updates, 'Admin', selectedMember);
 
-    // Sync latest payment's start_date if edited
-    const memPayments = payments.filter(p => p.member_id === selectedMember.id);
-    if (memPayments.length > 0 && editData.sub_start_date) {
+    // Sync latest payment's member_name, start_date, end_date, and notes if edited
+    const memPayments = payments.filter(p =>
+      p.member_id === selectedMember.id ||
+      p.member_id === selectedMember.permanent_id ||
+      p.member_id === selectedMember.student_no ||
+      (p.member_name && selectedMember.full_name && p.member_name.trim().toLowerCase() === selectedMember.full_name.trim().toLowerCase())
+    );
+    if (memPayments.length > 0) {
+      memPayments.sort((a, b) => {
+        const tA = a.paid_at ? new Date(a.paid_at).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
+        const tB = b.paid_at ? new Date(b.paid_at).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
+        return tB - tA;
+      });
       const latestP = memPayments[0];
+      let updatedNotes = latestP.notes || "";
+      if (editData.sub_start_date) {
+        if (updatedNotes.includes("Start Date:")) {
+          updatedNotes = updatedNotes.replace(/Start Date:\s*\d{4}-\d{2}-\d{2}/i, `Start Date: ${editData.sub_start_date}`);
+        } else {
+          updatedNotes += ` — Start Date: ${editData.sub_start_date}`;
+        }
+      }
+      if (finalSubEnd && !String(finalSubEnd).startsWith("1970")) {
+        if (updatedNotes.includes("Expiry:")) {
+          updatedNotes = updatedNotes.replace(/Expiry:\s*\d{4}-\d{2}-\d{2}/i, `Expiry: ${finalSubEnd}`);
+        } else {
+          updatedNotes += `, Expiry: ${finalSubEnd}`;
+        }
+      }
       try {
-        await supabase.from('payments').update({ start_date: editData.sub_start_date }).eq('id', latestP.id);
+        await supabase.from('payments').update({
+          member_name: editData.full_name || latestP.member_name,
+          notes: updatedNotes
+        }).eq('id', latestP.id);
       } catch (err) {}
     }
 
     setEditProfileModalOpen(false);
     await reloadData();
     alert(`Updated student profile for ${editData.full_name}!`);
+  };
+
+  const handleSyncSinglePayment = async (p, m) => {
+    const targetMember = m || members.find(mem => mem.id === p.member_id || mem.permanent_id === p.member_id || mem.student_no === p.member_id);
+    if (!targetMember) {
+      alert("Student profile details could not be found to sync with this invoice.");
+      return;
+    }
+
+    const dates = getMemberSubscriptionDates(targetMember, payments);
+    const subStart = dates.subStart !== "--" ? dates.subStart : null;
+    const subExpiry = dates.subExpiry !== "--" ? dates.subExpiry : null;
+
+    let updatedNotes = p.notes || "";
+    if (subStart) {
+      if (updatedNotes.includes("Start Date:")) {
+        updatedNotes = updatedNotes.replace(/Start Date:\s*\d{4}-\d{2}-\d{2}/i, `Start Date: ${subStart}`);
+      } else {
+        updatedNotes += ` — Start Date: ${subStart}`;
+      }
+    }
+
+    if (subExpiry) {
+      if (updatedNotes.includes("Expiry:")) {
+        updatedNotes = updatedNotes.replace(/Expiry:\s*\d{4}-\d{2}-\d{2}/i, `Expiry: ${subExpiry}`);
+      } else {
+        updatedNotes += `, Expiry: ${subExpiry}`;
+      }
+    }
+
+    try {
+      await supabase.from('payments').update({
+        member_name: targetMember.full_name,
+        notes: updatedNotes
+      }).eq('id', p.id);
+
+      await reloadData();
+      alert(`Invoice ${p.invoice_id || ''} refreshed & synced with ${targetMember.full_name}'s profile details!`);
+    } catch (err) {
+      alert("Failed to sync invoice: " + err.message);
+    }
   };
 
   // PDF Export
@@ -608,7 +680,7 @@ export default function MembersDirectoryPage() {
                         <td className="p-4 font-mono text-purple-700 font-bold">
                           {m.has_locker ? (m.locker_no || "Yes") : "No"}
                         </td>
-                        <td className="p-4 font-mono text-slate-600">{m.subscription_end_date}</td>
+                        <td className="p-4 font-mono text-slate-600">{(m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970")) ? m.subscription_end_date : "--"}</td>
                         <td className="p-4">
                           <span
                             className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase ${
@@ -734,23 +806,16 @@ export default function MembersDirectoryPage() {
                   <div><span className="text-slate-400 font-medium block">Shift Plan:</span> <p className="font-bold text-slate-800">{selectedMember.shift}</p></div>
                   <div><span className="text-slate-400 font-medium block">Assigned Seat:</span> <p className="font-mono font-bold text-cyan-700">{selectedMember.seat_no || "Unassigned"}</p></div>
                   <div><span className="text-slate-400 font-medium block">Locker Assigned:</span> <p className="font-mono font-bold text-purple-700">{selectedMember.has_locker ? (selectedMember.locker_no || "Yes") : "No Locker"}</p></div>
-                  <div><span className="text-slate-400 font-medium block">Initial Admission Date:</span> <p className="font-mono font-bold text-slate-700">{selectedMember.joining_date || "N/A"}</p></div>
-                  <div><span className="text-slate-400 font-medium block">Subscription Start Date:</span> <p className="font-mono font-bold text-indigo-600">{(() => {
-                    const memPayments = getMemberPayments(selectedMember);
-                    if (memPayments.length > 0) {
-                      const latestPayment = memPayments[0];
-                      const latestDate = latestPayment.start_date ? latestPayment.start_date.substring(0, 10) : (latestPayment.paid_at ? latestPayment.paid_at.substring(0, 10) : null);
-                      if (latestDate) return latestDate;
-                    }
-                    return selectedMember.joining_date || "N/A";
-                  })()}</p></div>
-                  <div><span className="text-slate-400 font-medium block">Subscription Expiry Date:</span> <p className="font-mono font-bold text-emerald-600">{(() => {
-                    const memPayments = getMemberPayments(selectedMember);
-                    const latestPayment = memPayments.length > 0 ? memPayments[0] : null;
-                    const subStart = latestPayment?.start_date ? latestPayment.start_date.substring(0, 10) : (latestPayment?.paid_at ? latestPayment.paid_at.substring(0, 10) : selectedMember.joining_date);
-                    if (subStart) return addOneMonth(subStart);
-                    return selectedMember.subscription_end_date || "N/A";
-                  })()}</p></div>
+                  {(() => {
+                    const dates = getMemberSubscriptionDates(selectedMember, payments);
+                    return (
+                      <>
+                        <div><span className="text-slate-400 font-medium block">Initial Admission Date:</span> <p className="font-mono font-bold text-slate-700">{dates.initialAdmissionDate}</p></div>
+                        <div><span className="text-slate-400 font-medium block">Subscription Start Date:</span> <p className="font-mono font-bold text-indigo-600">{dates.subStart}</p></div>
+                        <div><span className="text-slate-400 font-medium block">Subscription Expiry Date:</span> <p className="font-mono font-bold text-emerald-600">{dates.subExpiry}</p></div>
+                      </>
+                    );
+                  })()}
                   <div><span className="text-slate-400 font-medium block">Duration:</span> <p className="font-mono font-bold text-slate-700">1 Month</p></div>
                   <div><span className="text-slate-400 font-medium block">Outstanding Dues:</span> <p className="font-mono font-bold text-amber-600">₹{selectedMember.outstanding_dues || 0}</p></div>
                   {selectedMember.outstanding_dues > 0 && (
@@ -781,11 +846,18 @@ export default function MembersDirectoryPage() {
                           </div>
                           <p className="text-[10px] text-slate-500 mt-0.5">{p.notes || "Subscription Payment"} • Date Paid: {p.paid_at ? p.paid_at.substring(0,10) : (p.created_at ? p.created_at.substring(0,10) : "")}</p>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           <div className="text-right">
                             <p className="font-mono font-black text-emerald-600">₹{p.amount}</p>
                             <span className="text-[9px] text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-full font-bold border border-cyan-200">{p.payment_mode}</span>
                           </div>
+                          <button
+                            onClick={() => handleSyncSinglePayment(p, selectedMember)}
+                            className="p-2 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors cursor-pointer"
+                            title="Refetch & Sync Invoice with Student Profile"
+                          >
+                            <RotateCw className="w-3.5 h-3.5" />
+                          </button>
                           <button
                             onClick={() => handleDeletePayment(p.id)}
                             className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors cursor-pointer"
@@ -1028,7 +1100,14 @@ export default function MembersDirectoryPage() {
                   <input
                     type="date"
                     value={editData.subscription_end_date}
-                    onChange={(e) => setEditData({ ...editData, subscription_end_date: e.target.value })}
+                    onChange={(e) => {
+                      const newEnd = e.target.value;
+                      setEditData({
+                        ...editData,
+                        subscription_end_date: newEnd,
+                        sub_start_date: newEnd ? subtractOneMonth(newEnd) : editData.sub_start_date
+                      });
+                    }}
                     className="w-full bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3 text-emerald-950 font-mono font-black outline-none focus:border-emerald-500"
                   />
                 </div>

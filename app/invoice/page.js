@@ -162,20 +162,19 @@ function InvoicePrintContent() {
   }
   const subscriptionStartDate = rawSubStart ? rawSubStart.split('-').reverse().join('/') : joiningDate;
 
-  // Valid Till / Expiry Date: Always calculate month-to-month cycle from Subscription Start Date
   let rawEndDate = "";
   if (payment?.notes) {
-    const matchExp = payment.notes.match(/(?:Expiry|Valid Till|End Date):\s*(\d{4}-\d{2}-\d{2})/i);
-    if (matchExp && matchExp[1]) {
-      rawEndDate = matchExp[1];
+    const matchEnd = payment.notes.match(/Expiry:\s*(\d{4}-\d{2}-\d{2})/i);
+    if (matchEnd && matchEnd[1]) {
+      rawEndDate = matchEnd[1];
     }
+  }
+  if (!rawEndDate && member?.subscription_end_date && !String(member.subscription_end_date).startsWith("1970")) {
+    rawEndDate = String(member.subscription_end_date).substring(0, 10);
   }
   if (!rawEndDate && rawSubStart) {
     rawEndDate = addOneMonth(rawSubStart);
-  } else if (!rawEndDate && member?.subscription_end_date) {
-    rawEndDate = String(member.subscription_end_date).substring(0, 10);
   }
-
   const endDate = rawEndDate ? rawEndDate.split('-').reverse().join('/') : "N/A";
   const startDate = subscriptionStartDate;
 

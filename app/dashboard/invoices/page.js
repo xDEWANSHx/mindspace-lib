@@ -13,14 +13,17 @@ import {
   X,
   Share2,
   Edit3,
-  Trash2
+  Trash2,
+  RotateCw
 } from "lucide-react";
 import {
   fetchPayments,
   fetchMembers,
   updatePaymentRecord,
-  deletePayment
+  deletePayment,
+  getMemberSubscriptionDates
 } from "@/lib/adminService";
+import { supabase } from "@/lib/supabase";
 import { exportListToPDF } from "@/lib/pdfExport";
 import { openWhatsAppDirectMessage } from "@/lib/whatsappTemplates";
 
@@ -28,6 +31,7 @@ export default function InvoicesLedgerPage() {
   const [activeBranch, setActiveBranch] = useState("main_branch");
   const [selectedMonth, setSelectedMonth] = useState(() => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); });
   const [payments, setPayments] = useState([]);
+  const [members, setMembers] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("newest"); // newest, oldest, amount-desc, amount-asc
   const [previewInvoice, setPreviewInvoice] = useState(null);
@@ -75,8 +79,12 @@ export default function InvoicesLedgerPage() {
 
   useEffect(() => {
     async function load() {
-      const pList = await fetchPayments(activeBranch);
+      const [pList, mList] = await Promise.all([
+        fetchPayments(activeBranch),
+        fetchMembers(activeBranch)
+      ]);
       setPayments(pList);
+      setMembers(mList);
     }
     load();
   }, [activeBranch]);
@@ -110,6 +118,64 @@ export default function InvoicesLedgerPage() {
     const numB = parseInt(String(b.invoice_id || '').replace(/\D/g, ''), 10) || 0;
     return numB - numA;
   });
+
+  const handleSyncInvoiceWithStudent = async (p) => {
+    let mList = members;
+    if (!mList || mList.length === 0) {
+      mList = await fetchMembers(activeBranch);
+      setMembers(mList);
+    }
+
+    let foundMem = (mList || []).find(m => m.id === p.member_id || m.permanent_id === p.member_id || m.student_no === p.member_id);
+    if (!foundMem && p.member_name) {
+      const pName = p.member_name.trim().toLowerCase();
+      foundMem = (mList || []).find(m => m.full_name && m.full_name.trim().toLowerCase() === pName);
+    }
+    if (!foundMem && p.member_id) {
+      try {
+        const { data: dbMem } = await supabase.from('members').select('*').eq('id', p.member_id).single();
+        if (dbMem) foundMem = dbMem;
+      } catch (err) {}
+    }
+
+    if (!foundMem) {
+      alert("Matching student record not found to refetch details from.");
+      return;
+    }
+
+    const dates = getMemberSubscriptionDates(foundMem, payments);
+    const subStart = dates.subStart !== "--" ? dates.subStart : null;
+    const subExpiry = dates.subExpiry !== "--" ? dates.subExpiry : null;
+
+    let updatedNotes = p.notes || "";
+    if (subStart) {
+      if (updatedNotes.includes("Start Date:")) {
+        updatedNotes = updatedNotes.replace(/Start Date:\s*\d{4}-\d{2}-\d{2}/i, `Start Date: ${subStart}`);
+      } else {
+        updatedNotes += ` — Start Date: ${subStart}`;
+      }
+    }
+    if (subExpiry) {
+      if (updatedNotes.includes("Expiry:")) {
+        updatedNotes = updatedNotes.replace(/Expiry:\s*\d{4}-\d{2}-\d{2}/i, `Expiry: ${subExpiry}`);
+      } else {
+        updatedNotes += `, Expiry: ${subExpiry}`;
+      }
+    }
+
+    try {
+      await supabase.from('payments').update({
+        member_name: foundMem.full_name,
+        notes: updatedNotes
+      }).eq('id', p.id);
+
+      const pList = await fetchPayments(activeBranch);
+      setPayments(pList);
+      alert(`Invoice ${p.invoice_id} successfully updated & synced with ${foundMem.full_name}'s profile details!`);
+    } catch (err) {
+      alert("Failed to sync invoice: " + err.message);
+    }
+  };
 
   const handleExportPDF = () => {
     const columns = ["Invoice ID", "Student Member", "Amount", "Payment Mode", "Date"];
@@ -208,6 +274,14 @@ export default function InvoicesLedgerPage() {
                       </td>
                       <td className="p-4 font-mono text-slate-500 text-[10px]">{p.paid_at ? p.paid_at.substring(0, 10) : ""}</td>
                       <td className="p-4 text-right flex justify-end gap-2">
+                        <button
+                          onClick={() => handleSyncInvoiceWithStudent(p)}
+                          className="px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-semibold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                          title="Refetch & Sync Invoice with Student Profile"
+                        >
+                          <RotateCw className="w-3.5 h-3.5" />
+                          <span>Sync</span>
+                        </button>
                         <button
                           onClick={() => handleOpenEditPayment(p)}
                           className="px-3 py-1.5 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
@@ -359,7 +433,7 @@ export default function InvoicesLedgerPage() {
                 </div>
 
                 <div>
-                  <label className="text-slate-700 font-extrabold mb-1 block">Payment Date (paid_at)</label>
+                  <label className="text-cyan-900 font-extrabold mb-1 block">DATE PAID (COLLECTION DATE)</label>
                   <input
                     type="date"
                     value={editForm.paid_at}
