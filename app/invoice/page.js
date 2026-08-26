@@ -149,12 +149,27 @@ function InvoicePrintContent() {
   const joiningDate = rawJoining ? String(rawJoining).substring(0, 10).split('-').reverse().join('/') : "N/A";
 
   // Subscription Start Date for THIS transaction invoice
-  const rawSubStartStr = payment?.start_date || payment?.paid_at || payment?.created_at || member?.joining_date;
-  const rawSubStart = rawSubStartStr ? String(rawSubStartStr).substring(0, 10) : (rawJoining ? String(rawJoining).substring(0, 10) : "");
+  let rawSubStart = "";
+  if (payment?.notes) {
+    const matchStart = payment.notes.match(/Start Date:\s*(\d{4}-\d{2}-\d{2})/i);
+    if (matchStart && matchStart[1]) {
+      rawSubStart = matchStart[1];
+    }
+  }
+  if (!rawSubStart) {
+    const rawSubStartStr = payment?.start_date || payment?.paid_at || payment?.created_at || member?.joining_date;
+    rawSubStart = rawSubStartStr ? String(rawSubStartStr).substring(0, 10) : "";
+  }
   const subscriptionStartDate = rawSubStart ? rawSubStart.split('-').reverse().join('/') : joiningDate;
 
   // Valid Till / Expiry Date: Always calculate month-to-month cycle from Subscription Start Date
-  let rawEndDate = payment?.end_date ? String(payment.end_date).substring(0, 10) : "";
+  let rawEndDate = "";
+  if (payment?.notes) {
+    const matchExp = payment.notes.match(/(?:Expiry|Valid Till|End Date):\s*(\d{4}-\d{2}-\d{2})/i);
+    if (matchExp && matchExp[1]) {
+      rawEndDate = matchExp[1];
+    }
+  }
   if (!rawEndDate && rawSubStart) {
     rawEndDate = addOneMonth(rawSubStart);
   } else if (!rawEndDate && member?.subscription_end_date) {

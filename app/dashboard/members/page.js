@@ -210,9 +210,20 @@ export default function MembersDirectoryPage() {
     return numB - numA;
   });
 
+  // Helper to match payments for a member
+  const getMemberPayments = (m) => {
+    if (!m) return [];
+    return payments.filter(p =>
+      p.member_id === m.id ||
+      p.member_id === m.permanent_id ||
+      p.member_id === m.student_no ||
+      (p.member_name && m.full_name && p.member_name.trim().toLowerCase() === m.full_name.trim().toLowerCase())
+    );
+  };
+
   // Action: Open Edit Modal with ALL FIELDS initialized
   const openEditModal = (m) => {
-    const memPayments = payments.filter(p => p.member_id === m.id);
+    const memPayments = getMemberPayments(m);
     const latestP = memPayments.length > 0 ? memPayments[0] : null;
     const currentSubStart = latestP?.start_date ? latestP.start_date.substring(0, 10) : (latestP?.paid_at ? latestP.paid_at.substring(0, 10) : m.joining_date);
 
@@ -725,7 +736,7 @@ export default function MembersDirectoryPage() {
                   <div><span className="text-slate-400 font-medium block">Locker Assigned:</span> <p className="font-mono font-bold text-purple-700">{selectedMember.has_locker ? (selectedMember.locker_no || "Yes") : "No Locker"}</p></div>
                   <div><span className="text-slate-400 font-medium block">Initial Admission Date:</span> <p className="font-mono font-bold text-slate-700">{selectedMember.joining_date || "N/A"}</p></div>
                   <div><span className="text-slate-400 font-medium block">Subscription Start Date:</span> <p className="font-mono font-bold text-indigo-600">{(() => {
-                    const memPayments = payments.filter(p => p.member_id === selectedMember.id);
+                    const memPayments = getMemberPayments(selectedMember);
                     if (memPayments.length > 0) {
                       const latestPayment = memPayments[0];
                       const latestDate = latestPayment.start_date ? latestPayment.start_date.substring(0, 10) : (latestPayment.paid_at ? latestPayment.paid_at.substring(0, 10) : null);
@@ -734,7 +745,7 @@ export default function MembersDirectoryPage() {
                     return selectedMember.joining_date || "N/A";
                   })()}</p></div>
                   <div><span className="text-slate-400 font-medium block">Subscription Expiry Date:</span> <p className="font-mono font-bold text-emerald-600">{(() => {
-                    const memPayments = payments.filter(p => p.member_id === selectedMember.id);
+                    const memPayments = getMemberPayments(selectedMember);
                     const latestPayment = memPayments.length > 0 ? memPayments[0] : null;
                     const subStart = latestPayment?.start_date ? latestPayment.start_date.substring(0, 10) : (latestPayment?.paid_at ? latestPayment.paid_at.substring(0, 10) : selectedMember.joining_date);
                     if (subStart) return addOneMonth(subStart);
@@ -752,14 +763,23 @@ export default function MembersDirectoryPage() {
               <div className="space-y-3">
                 <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Payment History Ledger</h4>
                 <div className="space-y-2">
-                  {payments.filter(p => p.member_id === selectedMember.id).length === 0 ? (
+                  {getMemberPayments(selectedMember).length === 0 ? (
                     <p className="text-xs text-slate-400 italic">No payment transaction records logged for this student.</p>
                   ) : (
-                    payments.filter(p => p.member_id === selectedMember.id).map(p => (
-                      <div key={p.id} className="flex justify-between items-center p-3 rounded-2xl bg-white border border-slate-200 text-xs shadow-sm">
+                    getMemberPayments(selectedMember).map(p => (
+                      <div key={p.id} className="flex justify-between items-center p-3 rounded-2xl bg-white border border-slate-200 text-xs shadow-sm hover:border-cyan-200 transition-all">
                         <div>
-                          <p className="font-bold text-slate-900">Invoice: {p.invoice_id}</p>
-                          <p className="text-[10px] text-slate-500">{p.notes || "Subscription Payment"} • {p.paid_at ? p.paid_at.substring(0,10) : ""}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-slate-900">Invoice: {p.invoice_id || p.id}</p>
+                            <Link
+                              href={`/invoice?id=${p.invoice_id || p.id}`}
+                              target="_blank"
+                              className="px-2 py-0.5 rounded-md bg-cyan-50 text-cyan-700 font-extrabold text-[10px] hover:bg-cyan-100 transition-colors"
+                            >
+                              📄 View Invoice
+                            </Link>
+                          </div>
+                          <p className="text-[10px] text-slate-500 mt-0.5">{p.notes || "Subscription Payment"} • Date Paid: {p.paid_at ? p.paid_at.substring(0,10) : (p.created_at ? p.created_at.substring(0,10) : "")}</p>
                         </div>
                         <div className="flex items-center gap-3">
                           <div className="text-right">
@@ -768,7 +788,7 @@ export default function MembersDirectoryPage() {
                           </div>
                           <button
                             onClick={() => handleDeletePayment(p.id)}
-                            className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                            className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors cursor-pointer"
                             title="Delete Payment Record"
                           >
                             <Trash2 className="w-3.5 h-3.5" />

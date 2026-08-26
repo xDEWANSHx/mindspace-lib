@@ -235,19 +235,16 @@ function RecordPaymentContent() {
       setOverrideExpiryDate("");
       const todayStr = formatDate(new Date());
       const pDate = paidDate || todayStr;
-      const subEnd = selectedMemberObj.subscription_end_date;
-      const hasActiveExpiry = subEnd && subEnd >= pDate;
-      const nextDayOfExpiry = subEnd ? addDaysToDate(subEnd, 1) : pDate;
 
       if (selectedMemberObj.outstanding_dues > 0) {
         setPaymentType("COLLECT_DUES");
         setAmountPaidToday(selectedMemberObj.outstanding_dues);
-        setJoiningDate(selectedMemberObj.joining_date || pDate);
+        setJoiningDate(pDate);
       } else {
         setPaymentType("FULL");
         setPlanFee(selectedMemberObj.plan_amount || 1100);
         setAmountPaidToday(selectedMemberObj.plan_amount || 1100);
-        setJoiningDate(hasActiveExpiry ? nextDayOfExpiry : pDate);
+        setJoiningDate(pDate);
       }
     }
   }, [selectedMemberId]);
@@ -257,10 +254,7 @@ function RecordPaymentContent() {
     if (selectedMemberObj && paymentType !== "COLLECT_DUES") {
       const todayStr = formatDate(new Date());
       const pDate = paidDate || todayStr;
-      const subEnd = selectedMemberObj.subscription_end_date;
-      const hasActiveExpiry = subEnd && subEnd >= pDate;
-      const nextDayOfExpiry = subEnd ? addDaysToDate(subEnd, 1) : pDate;
-      setJoiningDate(hasActiveExpiry ? nextDayOfExpiry : pDate);
+      setJoiningDate(pDate);
     }
   }, [paymentType]);
 
