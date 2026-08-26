@@ -178,11 +178,18 @@ export default function MembersDirectoryPage() {
 
     if (sortBy === 'name-asc') return (a.full_name || '').localeCompare(b.full_name || '');
     if (sortBy === 'name-desc') return (b.full_name || '').localeCompare(a.full_name || '');
+    
     if (sortBy === 'oldest') {
-      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return timeA - timeB;
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : (a.joining_date ? new Date(a.joining_date).getTime() : 0);
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : (b.joining_date ? new Date(b.joining_date).getTime() : 0);
+      if (timeA !== timeB && !isNaN(timeA) && !isNaN(timeB) && timeA > 0 && timeB > 0) {
+        return timeA - timeB;
+      }
+      const numA = parseInt(String(a.permanent_id || a.student_no || '').replace(/\D/g, ''), 10) || 0;
+      const numB = parseInt(String(b.permanent_id || b.student_no || '').replace(/\D/g, ''), 10) || 0;
+      return numA - numB;
     }
+    
     if (sortBy === 'seat-asc' || sortBy === 'seat-desc') {
       const rawA = a.seat_no || '';
       const rawB = b.seat_no || '';
@@ -192,9 +199,14 @@ export default function MembersDirectoryPage() {
     }
 
     // Default: newest
-    const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-    const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-    return timeB - timeA;
+    const timeA = a.created_at ? new Date(a.created_at).getTime() : (a.joining_date ? new Date(a.joining_date).getTime() : 0);
+    const timeB = b.created_at ? new Date(b.created_at).getTime() : (b.joining_date ? new Date(b.joining_date).getTime() : 0);
+    if (timeA !== timeB && !isNaN(timeA) && !isNaN(timeB) && timeA > 0 && timeB > 0) {
+      return timeB - timeA;
+    }
+    const numA = parseInt(String(a.permanent_id || a.student_no || '').replace(/\D/g, ''), 10) || 0;
+    const numB = parseInt(String(b.permanent_id || b.student_no || '').replace(/\D/g, ''), 10) || 0;
+    return numB - numA;
   });
 
   // Action: Open Edit Modal with ALL FIELDS initialized

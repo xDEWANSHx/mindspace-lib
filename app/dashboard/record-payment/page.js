@@ -1422,7 +1422,12 @@ function RecordPaymentContent() {
                   const displayPayments = [...rawPayments].sort((a, b) => {
                     const timeA = a.paid_at ? new Date(a.paid_at).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
                     const timeB = b.paid_at ? new Date(b.paid_at).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
-                    return timeB - timeA;
+                    if (timeA !== timeB && !isNaN(timeA) && !isNaN(timeB) && timeA > 0 && timeB > 0) {
+                      return timeB - timeA;
+                    }
+                    const numA = parseInt(String(a.invoice_id || '').replace(/\D/g, ''), 10) || 0;
+                    const numB = parseInt(String(b.invoice_id || '').replace(/\D/g, ''), 10) || 0;
+                    return numB - numA;
                   });
 
                   if (displayPayments.length === 0) {
