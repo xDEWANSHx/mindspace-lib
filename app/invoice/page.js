@@ -132,7 +132,10 @@ function InvoicePrintContent() {
   const receiptNo = payment.invoice_id || `REC-B-${Date.now().toString().slice(-5)}`;
   
   // Formatted dates
-  const rawPaidAt = payment.paid_at || payment.created_at;
+  let rawPaidAt = payment.paid_at || payment.created_at;
+  if (member?.joining_date && rawPaidAt && String(rawPaidAt).substring(0, 10) < String(member.joining_date).substring(0, 10)) {
+    rawPaidAt = member.joining_date;
+  }
   const receiptDate = rawPaidAt ? String(rawPaidAt).substring(0, 10).split('-').reverse().join('/') : formatDate(new Date()).split('-').reverse().join('/');
   
   const studentAllotmentNo = member?.permanent_id || `#MS26B${Date.now().toString().slice(-2)}`;
@@ -147,7 +150,10 @@ function InvoicePrintContent() {
   const joiningDate = rawJoining ? String(rawJoining).substring(0, 10).split('-').reverse().join('/') : receiptDate;
 
   // Subscription Start Date for THIS transaction invoice
-  const rawSubStartStr = payment?.start_date || payment?.paid_at || payment?.created_at || member?.joining_date;
+  let rawSubStartStr = payment?.start_date || payment?.paid_at || payment?.created_at || member?.joining_date;
+  if (rawJoining && rawSubStartStr && rawSubStartStr.substring(0, 10) < String(rawJoining).substring(0, 10)) {
+    rawSubStartStr = rawJoining;
+  }
   const rawSubStart = rawSubStartStr ? String(rawSubStartStr).substring(0, 10) : formatDate(new Date());
   const subscriptionStartDate = rawSubStart.split('-').reverse().join('/');
 
