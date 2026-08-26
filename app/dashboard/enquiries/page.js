@@ -477,9 +477,9 @@ export default function EnquiriesCRMPage() {
                     onChange={(e) => setNewLead({ ...newLead, interest: e.target.value })}
                     className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-slate-900"
                   >
-                    <option value="Full Day">Full Day (24x7 Access)</option>
-                    <option value="Morning">Morning Shift (6 AM - 2 PM)</option>
-                    <option value="Evening">Evening Shift (2 PM - 10 PM)</option>
+                    <option value="Full Day">Full Day Access (06:00 AM - 10:00 PM)</option>
+                    <option value="Morning">Morning Shift (06:00 AM - 02:00 PM)</option>
+                    <option value="Evening">Evening Shift (02:00 PM - 10:00 PM)</option>
                   </select>
                 </div>
 

@@ -1687,15 +1687,14 @@ function RecordPaymentContent() {
                     value={editFormData.shift}
                     onChange={(e) => {
                       const newShift = e.target.value;
-                      const autoPlanPrice = newShift === "Full Day" ? 1100 : (newShift === "Morning" || newShift === "Evening" || newShift === "Afternoon" || newShift === "Night" ? 600 : editFormData.plan_amount);
+                      const autoPlanPrice = newShift === "Full Day" ? 1100 : (newShift === "Morning" || newShift === "Evening" ? 600 : editFormData.plan_amount);
                       setEditFormData({ ...editFormData, shift: newShift, plan_amount: autoPlanPrice });
                     }}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-900 font-bold"
                   >
-                    <option value="Full Day">Full Day Shift (24 hrs)</option>
+                    <option value="Full Day">Full Day Access (06:00 AM - 10:00 PM)</option>
                     <option value="Morning">Morning Shift (06:00 AM - 02:00 PM)</option>
-                    <option value="Evening">Evening Shift (06:00 PM - 12:00 AM)</option>
-                    <option value="Night">Night Shift (10:00 PM - 06:00 AM)</option>
+                    <option value="Evening">Evening Shift (02:00 PM - 10:00 PM)</option>
                   </select>
                 </div>
 

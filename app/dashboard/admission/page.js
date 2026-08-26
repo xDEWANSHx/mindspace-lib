@@ -413,7 +413,7 @@ export default function NewAdmissionPage() {
   // Update plan amount when shift changes
   const handleShiftChange = (shiftVal) => {
     let basePrice = 1100;
-    if (shiftVal === "Morning" || shiftVal === "Evening" || shiftVal === "Afternoon" || shiftVal === "Night") {
+    if (shiftVal === "Morning" || shiftVal === "Evening") {
       basePrice = 600;
     }
     setFormData(prev => {
@@ -1113,7 +1113,7 @@ export default function NewAdmissionPage() {
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[
-                      { shift: "Full Day", title: "Full Day Access", time: "24 Hours Exclusive", price: "₹1,100 / mo" },
+                      { shift: "Full Day", title: "Full Day Access", time: "06:00 AM – 10:00 PM", price: "₹1,100 / mo" },
                       { shift: "Morning", title: "Morning Shift", time: "06:00 AM – 02:00 PM", price: "₹600 / mo" },
                       { shift: "Evening", title: "Evening Shift", time: "02:00 PM – 10:00 PM", price: "₹600 / mo" }
                     ].map(p => (
@@ -1179,7 +1179,7 @@ export default function NewAdmissionPage() {
                         const nextHasLocker = !formData.has_locker;
                         const fee = formData.locker_fee || 50;
                         let baseShiftPrice = 1100;
-                        if (formData.shift === "Morning" || formData.shift === "Evening" || formData.shift === "Afternoon" || formData.shift === "Night") {
+                        if (formData.shift === "Morning" || formData.shift === "Evening") {
                           baseShiftPrice = 600;
                         }
 

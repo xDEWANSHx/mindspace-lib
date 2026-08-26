@@ -1101,9 +1101,9 @@ export default function SeatingMapPage() {
                   onChange={(e) => setShiftChoice(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none font-bold text-xs"
                 >
+                  <option value="Full Day">Full Day Access (06:00 AM - 10:00 PM)</option>
                   <option value="Morning">Morning Shift (06:00 AM - 02:00 PM)</option>
                   <option value="Evening">Evening Shift (02:00 PM - 10:00 PM)</option>
-                  <option value="Full Day">Full Day Access (24 Hours Exclusive)</option>
                 </select>
               </div>
 
