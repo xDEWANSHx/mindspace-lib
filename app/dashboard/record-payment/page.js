@@ -145,22 +145,25 @@ function RecordPaymentContent() {
   }, [amountPaidToday, paymentMode]);
 
   useEffect(() => {
-    let baseRate = parseFloat(selectedMemberObj?.plan_amount || 1100);
-    if (selectedMemberObj?.shift === "Full Day" && baseRate === 600) {
-      baseRate = 1100;
+    let storedPlanAmount = parseFloat(selectedMemberObj?.plan_amount || 1100);
+    if (selectedMemberObj?.shift === "Full Day" && storedPlanAmount === 600) {
+      storedPlanAmount = 1100;
     }
-    const lockerAddOn = includeLocker ? parseFloat(lockerFee || 50) : 0;
+    const fee = parseFloat(lockerFee || 50);
+    const baseShiftRate = selectedMemberObj?.has_locker ? Math.max(0, storedPlanAmount - fee) : storedPlanAmount;
+    const monthlyRate = includeLocker ? (baseShiftRate + fee) : baseShiftRate;
+
     if (durationTab === "1M") {
-      setPlanFee(baseRate + lockerAddOn);
+      setPlanFee(monthlyRate);
     } else if (durationTab === "3M") {
-      setPlanFee((baseRate * 3) + lockerAddOn);
+      setPlanFee(monthlyRate * 3);
     } else if (durationTab === "6M") {
-      setPlanFee((baseRate * 6) + lockerAddOn);
+      setPlanFee(monthlyRate * 6);
     } else if (durationTab === "12M") {
-      setPlanFee((baseRate * 12) + lockerAddOn);
+      setPlanFee(monthlyRate * 12);
     }
     // In CUSTOM mode, planFee is managed directly by Admin's manual Net Payable input!
-  }, [durationTab, selectedMemberId, selectedMemberObj?.plan_amount, selectedMemberObj?.shift, includeLocker, lockerFee]);
+  }, [durationTab, selectedMemberId, selectedMemberObj?.plan_amount, selectedMemberObj?.shift, selectedMemberObj?.has_locker, includeLocker, lockerFee]);
 
   const parsedDiscount = Math.max(0, parseFloat(discountAmount || 0));
   const effectivePayable = Math.max(0, parseFloat(planFee || 0) - parsedDiscount);
@@ -1144,16 +1147,7 @@ function RecordPaymentContent() {
                     
                     <button
                       type="button"
-                      onClick={() => {
-                        const nextState = !includeLocker;
-                        setIncludeLocker(nextState);
-                        const fee = parseFloat(lockerFee || 50);
-                        if (nextState) {
-                          setPlanFee(prev => prev + fee);
-                        } else {
-                          setPlanFee(prev => Math.max(0, prev - fee));
-                        }
-                      }}
+                      onClick={() => setIncludeLocker(prev => !prev)}
                       className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
                         includeLocker
                           ? "bg-purple-600 text-white shadow-md hover:bg-purple-700"
