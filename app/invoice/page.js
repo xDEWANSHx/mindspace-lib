@@ -270,45 +270,82 @@ function InvoicePrintContent() {
   };
 
   const handleCopyImageAndOpenWhatsApp = async () => {
-    setCopyToast("Generating & Copying Receipt Image...");
+    setCopyToast("Generating & Copying Receipt Photo...");
     const element = document.getElementById("a4-invoice-printable");
     if (!element) return;
 
     const { message, waUrl } = getWhatsAppMessageAndUrl();
     let copiedSuccessfully = false;
 
-    // 1. FIRST: Copy image to Clipboard WHILE DOCUMENT IS STILL FOCUSED
     try {
-      const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(element, { scale: 2, useCORS: true, logging: false });
+      if (navigator.clipboard && window.ClipboardItem) {
+        // Pass Promise synchronously to ClipboardItem BEFORE any await keyword to preserve Chrome user gesture
+        const imagePromise = new Promise(async (resolve, reject) => {
+          try {
+            const html2canvas = (await import("html2canvas")).default;
+            const canvas = await html2canvas(element, {
+              scale: 2,
+              useCORS: true,
+              allowTaint: true,
+              backgroundColor: "#ffffff",
+              logging: false,
+              onclone: (clonedDoc) => {
+                const imgs = clonedDoc.getElementsByTagName("img");
+                for (let img of imgs) {
+                  img.crossOrigin = "anonymous";
+                }
+              }
+            });
 
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-      if (blob && navigator.clipboard && window.ClipboardItem) {
-        window.focus();
-        await navigator.clipboard.write([
-          new ClipboardItem({ "image/png": blob })
+            canvas.toBlob((blob) => {
+              if (blob) resolve(blob);
+              else reject(new Error("Canvas blob failed"));
+            }, "image/png");
+          } catch (e) {
+            reject(e);
+          }
+        });
+
+        // Trigger clipboard write synchronously on click gesture
+        const writePromise = navigator.clipboard.write([
+          new ClipboardItem({ "image/png": imagePromise })
         ]);
+
+        await writePromise;
         copiedSuccessfully = true;
       }
     } catch (err) {
       console.warn("Direct image clipboard write failed:", err);
+      // Fallback: Auto-download receipt PNG image if browser blocks clipboard image write
       try {
-        await navigator.clipboard.writeText(message);
-      } catch (tErr) {}
+        const html2canvas = (await import("html2canvas")).default;
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+          logging: false
+        });
+        const imgUrl = canvas.toDataURL("image/png");
+        const a = document.createElement("a");
+        a.href = imgUrl;
+        a.download = `Receipt_${receiptNo}.png`;
+        a.click();
+      } catch (e) {}
     }
 
-    // 2. SECOND: Open WhatsApp window AFTER clipboard write completes so window focus isn't stolen beforehand
+    // Open WhatsApp Chat Window
     window.open(waUrl, "_blank");
 
     if (copiedSuccessfully) {
-      setCopyToast("📋 Receipt Image copied to PC Clipboard! In WhatsApp, press Ctrl+V to paste image!");
+      setCopyToast("📸 Fee Receipt PHOTO copied to Clipboard! In WhatsApp, press Ctrl+V (Paste) to send receipt photo!");
     } else {
-      setCopyToast("🚀 Opening WhatsApp with pre-filled Receipt details...");
+      setCopyToast("🚀 WhatsApp Opened! If image copy was restricted, paste text or drag downloaded photo!");
     }
 
     setTimeout(() => {
       setCopyToast("");
-    }, 6000);
+    }, 7000);
   };
 
   return (
