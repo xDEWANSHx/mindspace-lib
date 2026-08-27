@@ -220,8 +220,8 @@ function InvoicePrintContent() {
     return `http://localhost:3000/invoice?id=${receiptNo}`;
   };
 
-  // WhatsApp Share Handler with Direct Receipt URL Link
-  const handleWhatsAppShare = () => {
+  // WhatsApp Share Handlers
+  const getWhatsAppMessageAndUrl = () => {
     const directUrl = getInvoiceDirectUrl();
     let message = `*MINDSPACE LIBRARY - OFFICIAL FEE RECEIPT*\n` +
       `Receipt No: ${receiptNo}\n` +
@@ -247,84 +247,61 @@ function InvoicePrintContent() {
     message += `\n📄 *View / Download Online Fee Receipt:* \n${directUrl}\n\n` +
       `Thank you for studying at MindSpace Library!`;
 
-    const cleanMobile = mobileNo ? mobileNo.replace(/\D/g, "") : "";
-    if (cleanMobile.length === 10) {
-      window.open(`https://wa.me/91${cleanMobile}?text=${encodeURIComponent(message)}`, "_blank");
-    } else {
-      window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
+    // Robust phone number extraction (handles 8, 10, or 12 digits with country code)
+    let phoneDigits = String(mobileNo || "").replace(/\D/g, "");
+    if (phoneDigits.length === 12 && phoneDigits.startsWith("91")) {
+      phoneDigits = phoneDigits.substring(2);
     }
+
+    let waUrl = "";
+    if (phoneDigits.length >= 7) {
+      const fullNum = (phoneDigits.length === 10 || phoneDigits.length === 8 || phoneDigits.length === 9) ? `91${phoneDigits}` : phoneDigits;
+      waUrl = `https://wa.me/${fullNum}?text=${encodeURIComponent(message)}`;
+    } else {
+      waUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    }
+
+    return { message, waUrl };
+  };
+
+  const handleWhatsAppShare = () => {
+    const { waUrl } = getWhatsAppMessageAndUrl();
+    window.open(waUrl, "_blank");
   };
 
   const handleCopyImageAndOpenWhatsApp = async () => {
-    setCopyToast("Preparing WhatsApp Receipt...");
+    setCopyToast("Generating & Copying Receipt Image...");
     const element = document.getElementById("a4-invoice-printable");
     if (!element) return;
 
-    // Prepare message text for WhatsApp Web URL
-    const directUrl = getInvoiceDirectUrl();
-    let message = `*MINDSPACE LIBRARY - OFFICIAL FEE RECEIPT*\n` +
-      `Receipt No: ${receiptNo}\n` +
-      (isPayLater ? `Activated On: ${receiptDate}\n` : `Date Paid: ${receiptDate}\n`) +
-      `Student Name: ${studentName}\n` +
-      `Allotment ID: ${studentAllotmentNo}\n` +
-      `Seat Allocated: ${seatNo} (${shiftName})\n` +
-      (isPayLater
-        ? `Payment Status: PAY LATER (₹${outstandingDues} dues pending)\n`
-        : `Amount Paid: ₹${paidAmount} (${payment.payment_mode || "Cash"})\n`) +
-      `Subscription Validity: ${startDate} to ${endDate}\n`;
-
-    if (!isFullySettled) {
-      message += `Outstanding Dues: ₹${outstandingDues}\n`;
-      if (promisedDateFormatted) {
-        message += `Promised Dues Payment Date: ${promisedDateFormatted} ${isPromisedOverdue ? '(OVERDUE)' : ''}\n`;
-      }
-      message += `Status: PARTIAL / DUES PENDING\n`;
-    } else {
-      message += `Status: FULLY SETTLED\n`;
-    }
-
-    message += `\n📄 *View / Download Online Fee Receipt:* \n${directUrl}\n\n` +
-      `Thank you for studying at MindSpace Library!`;
-
-    const cleanMobile = mobileNo ? mobileNo.replace(/\D/g, "") : "";
-    const waUrl = cleanMobile.length === 10
-      ? `https://wa.me/91${cleanMobile}?text=${encodeURIComponent(message)}`
-      : `https://wa.me/?text=${encodeURIComponent(message)}`;
-
-    // 1. Pre-open window immediately on user gesture to avoid popup blocking
-    const waWindow = window.open("about:blank", "_blank");
-
+    const { message, waUrl } = getWhatsAppMessageAndUrl();
     let copiedSuccessfully = false;
 
-    // 2. Render image and attempt clipboard copy
+    // 1. FIRST: Copy image to Clipboard WHILE DOCUMENT IS STILL FOCUSED
     try {
       const html2canvas = (await import("html2canvas")).default;
       const canvas = await html2canvas(element, { scale: 2, useCORS: true, logging: false });
 
       const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
       if (blob && navigator.clipboard && window.ClipboardItem) {
-        try {
-          await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-          copiedSuccessfully = true;
-        } catch (clipErr) {
-          try {
-            await navigator.clipboard.writeText(message);
-          } catch (tErr) {}
-        }
+        window.focus();
+        await navigator.clipboard.write([
+          new ClipboardItem({ "image/png": blob })
+        ]);
+        copiedSuccessfully = true;
       }
     } catch (err) {
-      console.warn("Clipboard write failed:", err);
+      console.warn("Direct image clipboard write failed:", err);
+      try {
+        await navigator.clipboard.writeText(message);
+      } catch (tErr) {}
     }
 
-    // 3. Navigate pre-opened window to WhatsApp wa.me URL with pre-filled receipt message
-    if (waWindow) {
-      waWindow.location.href = waUrl;
-    } else {
-      window.open(waUrl, "_blank");
-    }
+    // 2. SECOND: Open WhatsApp window AFTER clipboard write completes so window focus isn't stolen beforehand
+    window.open(waUrl, "_blank");
 
     if (copiedSuccessfully) {
-      setCopyToast("📋 Receipt details pre-filled & Receipt Image copied to Clipboard! Press Ctrl+V in WhatsApp if you want to paste the image!");
+      setCopyToast("📋 Receipt Image copied to PC Clipboard! In WhatsApp, press Ctrl+V to paste image!");
     } else {
       setCopyToast("🚀 Opening WhatsApp with pre-filled Receipt details...");
     }
