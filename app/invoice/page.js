@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { fetchPayments, fetchMembers, formatDate, addOneMonth } from "@/lib/adminService";
-import { Printer, Download, Share2, ArrowLeft, ShieldCheck, Calendar, Clock } from "lucide-react";
+import { Printer, Download, Share2, ArrowLeft, ShieldCheck, Calendar, Clock, Copy, Check } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -20,6 +20,7 @@ function InvoicePrintContent() {
   const [member, setMember] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copyToast, setCopyToast] = useState("");
+  const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -269,83 +270,28 @@ function InvoicePrintContent() {
     window.open(waUrl, "_blank");
   };
 
-  const handleCopyImageAndOpenWhatsApp = async () => {
-    setCopyToast("Generating & Copying Receipt Photo...");
-    const element = document.getElementById("a4-invoice-printable");
-    if (!element) return;
-
-    const { message, waUrl } = getWhatsAppMessageAndUrl();
-    let copiedSuccessfully = false;
-
+  const handleCopyInvoiceText = async () => {
+    const { message } = getWhatsAppMessageAndUrl();
     try {
-      if (navigator.clipboard && window.ClipboardItem) {
-        // Pass Promise synchronously to ClipboardItem BEFORE any await keyword to preserve Chrome user gesture
-        const imagePromise = new Promise(async (resolve, reject) => {
-          try {
-            const html2canvas = (await import("html2canvas")).default;
-            const canvas = await html2canvas(element, {
-              scale: 2,
-              useCORS: true,
-              allowTaint: true,
-              backgroundColor: "#ffffff",
-              logging: false,
-              onclone: (clonedDoc) => {
-                const imgs = clonedDoc.getElementsByTagName("img");
-                for (let img of imgs) {
-                  img.crossOrigin = "anonymous";
-                }
-              }
-            });
-
-            canvas.toBlob((blob) => {
-              if (blob) resolve(blob);
-              else reject(new Error("Canvas blob failed"));
-            }, "image/png");
-          } catch (e) {
-            reject(e);
-          }
-        });
-
-        // Trigger clipboard write synchronously on click gesture
-        const writePromise = navigator.clipboard.write([
-          new ClipboardItem({ "image/png": imagePromise })
-        ]);
-
-        await writePromise;
-        copiedSuccessfully = true;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(message);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = message;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
       }
+      setIsCopied(true);
+      setCopyToast("📋 Fee Receipt details & online link copied to clipboard!");
+      setTimeout(() => setIsCopied(false), 3000);
+      setTimeout(() => setCopyToast(""), 5000);
     } catch (err) {
-      console.warn("Direct image clipboard write failed:", err);
-      // Fallback: Auto-download receipt PNG image if browser blocks clipboard image write
-      try {
-        const html2canvas = (await import("html2canvas")).default;
-        const canvas = await html2canvas(element, {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: "#ffffff",
-          logging: false
-        });
-        const imgUrl = canvas.toDataURL("image/png");
-        const a = document.createElement("a");
-        a.href = imgUrl;
-        a.download = `Receipt_${receiptNo}.png`;
-        a.click();
-      } catch (e) {}
+      console.error("Failed to copy invoice text:", err);
+      setCopyToast("Failed to copy receipt details.");
+      setTimeout(() => setCopyToast(""), 4000);
     }
-
-    // Open WhatsApp Chat Window
-    window.open(waUrl, "_blank");
-
-    if (copiedSuccessfully) {
-      setCopyToast("📸 Fee Receipt PHOTO copied to Clipboard! In WhatsApp, press Ctrl+V (Paste) to send receipt photo!");
-    } else {
-      setCopyToast("🚀 WhatsApp Opened! If image copy was restricted, paste text or drag downloaded photo!");
-    }
-
-    setTimeout(() => {
-      setCopyToast("");
-    }, 7000);
   };
 
   return (
@@ -430,12 +376,12 @@ function InvoicePrintContent() {
           </button>
 
           <button
-            onClick={handleCopyImageAndOpenWhatsApp}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-600/30 transition-all cursor-pointer ring-2 ring-emerald-400/50"
-            title="Copies Receipt Image to PC Clipboard and opens WhatsApp Web. In WhatsApp, press Ctrl+V to send!"
+            onClick={handleCopyInvoiceText}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-black rounded-xl shadow-lg shadow-teal-600/30 transition-all cursor-pointer ring-2 ring-teal-400/50"
+            title="Copies full Receipt details & online link directly to Clipboard"
           >
-            <Share2 className="w-4 h-4 text-emerald-200" />
-            <span>Copy & Send via WhatsApp (Ctrl+V)</span>
+            {isCopied ? <Check className="w-4 h-4 text-emerald-200 animate-bounce" /> : <Copy className="w-4 h-4 text-teal-200" />}
+            <span>{isCopied ? "Copied!" : "Copy Invoice"}</span>
           </button>
         </div>
       </div>
