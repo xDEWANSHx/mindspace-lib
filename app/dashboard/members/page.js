@@ -988,8 +988,14 @@ export default function MembersDirectoryPage() {
                     value={editData.shift}
                     onChange={(e) => {
                       const newShift = e.target.value;
-                      const autoPlanPrice = newShift === "Full Day" ? 1100 : (newShift === "Morning" || newShift === "Evening" ? 600 : editData.plan_amount);
-                      setEditData({ ...editData, shift: newShift, plan_amount: autoPlanPrice });
+                      const oldBasePrice = editData.shift === "Full Day" ? 1100 : (editData.shift === "Morning" || editData.shift === "Evening" ? 600 : editData.plan_amount);
+                      const newBasePrice = newShift === "Full Day" ? 1100 : (newShift === "Morning" || newShift === "Evening" ? 600 : editData.plan_amount);
+                      const lockerAddOn = editData.has_locker ? 50 : 0;
+                      const autoPlanPrice = newBasePrice + lockerAddOn;
+                      const diff = newBasePrice - oldBasePrice;
+                      const currentDues = parseFloat(editData.outstanding_dues || 0);
+                      const newDues = Math.max(0, currentDues + diff);
+                      setEditData({ ...editData, shift: newShift, plan_amount: autoPlanPrice, outstanding_dues: newDues });
                     }}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none font-bold"
                   >

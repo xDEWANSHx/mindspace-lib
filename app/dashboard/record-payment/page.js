@@ -182,10 +182,10 @@ function RecordPaymentContent() {
     } else if (paymentType === "PARTIAL") {
       setAmountPaidToday(Math.round(netPay / 2));
     } else if (paymentType === "COLLECT_DUES") {
-      setAmountPaidToday(effectivePayable);
+      setAmountPaidToday(selectedMemberObj?.outstanding_dues || 0);
       setDiscountAmount(0);
     }
-  }, [paymentType, planFee, discountAmount, effectivePayable]);
+  }, [paymentType, planFee, discountAmount, effectivePayable, selectedMemberObj?.outstanding_dues]);
 
   useEffect(() => {
     async function load() {
@@ -286,7 +286,7 @@ function RecordPaymentContent() {
   } else if (paymentType === "PAY_LATER") {
     calculatedNewDues = Math.round(effectivePayable);
   } else if (paymentType === "COLLECT_DUES") {
-    calculatedNewDues = Math.max(0, Math.round(effectivePayable - parseFloat(amountPaidToday || 0)));
+    calculatedNewDues = Math.max(0, Math.round(currDues - parseFloat(amountPaidToday || 0)));
   }
 
   // Pending Dues Warning & Block Check
@@ -1698,8 +1698,12 @@ function RecordPaymentContent() {
                     value={editFormData.shift}
                     onChange={(e) => {
                       const newShift = e.target.value;
-                      const autoPlanPrice = newShift === "Full Day" ? 1100 : (newShift === "Morning" || newShift === "Evening" ? 600 : editFormData.plan_amount);
-                      setEditFormData({ ...editFormData, shift: newShift, plan_amount: autoPlanPrice });
+                      const oldBasePrice = editFormData.shift === "Full Day" ? 1100 : (editFormData.shift === "Morning" || editFormData.shift === "Evening" ? 600 : editFormData.plan_amount);
+                      const newBasePrice = newShift === "Full Day" ? 1100 : (newShift === "Morning" || newShift === "Evening" ? 600 : editFormData.plan_amount);
+                      const diff = newBasePrice - oldBasePrice;
+                      const currentDues = parseFloat(editFormData.outstanding_dues || 0);
+                      const newDues = Math.max(0, currentDues + diff);
+                      setEditFormData({ ...editFormData, shift: newShift, plan_amount: newBasePrice, outstanding_dues: newDues });
                     }}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-900 font-bold"
                   >
