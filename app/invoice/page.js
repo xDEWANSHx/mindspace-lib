@@ -180,7 +180,80 @@ function InvoicePrintContent() {
   const startDate = subscriptionStartDate;
 
   const paidAmount = parseFloat(payment.amount || 0);
-  const planAmount = parseFloat(member?.plan_amount || payment?.plan_amount || (paidAmount + (payment.outstanding_dues || member?.outstanding_dues || 0)));
+
+  // Parse total plan billing amount for this specific transaction
+  let planAmount = paidAmount;
+  if (payment?.notes) {
+    const matchOf = payment.notes.match(/Paid\s*₹?\s*(\d+)\s*of\s*₹?\s*(\d+)/i);
+    if (matchOf && matchOf[2]) {
+      planAmount = parseFloat(matchOf[2]);
+    }
+  }
+  if (paidAmount === 0 && (member?.outstanding_dues || payment?.outstanding_dues)) {
+    planAmount = parseFloat(member?.outstanding_dues || payment?.outstanding_dues || member?.plan_amount || 0);
+  } else if (planAmount === 0 && paidAmount > 0) {
+    planAmount = paidAmount;
+  }
+
+  // Dynamic Duration Text (e.g., "15 Days", "3 Days", "1 Month", etc.)
+  let durationText = "1 Month";
+  let termText = "1 month(s)";
+  if (payment?.notes) {
+    const matchDays = payment.notes.match(/(\d+)\s*days/i);
+    if (matchDays && matchDays[1]) {
+      const dCount = parseInt(matchDays[1]);
+      if (dCount === 30 || dCount === 31) {
+        durationText = "1 Month";
+        termText = "1 month";
+      } else if (dCount === 15) {
+        durationText = "15 Days";
+        termText = "15 days";
+      } else {
+        durationText = `${dCount} Days`;
+        termText = `${dCount} day(s)`;
+      }
+    } else if (payment.notes.toLowerCase().includes("15 days")) {
+      durationText = "15 Days";
+      termText = "15 days";
+    }
+  }
+  if (durationText === "1 Month" && rawSubStart && rawEndDate) {
+    const dStart = new Date(rawSubStart);
+    const dEnd = new Date(rawEndDate);
+    if (!isNaN(dStart.getTime()) && !isNaN(dEnd.getTime())) {
+      const diffDays = Math.round((dEnd - dStart) / (1000 * 60 * 60 * 24));
+      if (diffDays > 0) {
+        if (diffDays >= 28 && diffDays <= 31) {
+          durationText = "1 Month";
+          termText = "1 month";
+        } else if (diffDays === 15) {
+          durationText = "15 Days";
+          termText = "15 days";
+        } else if (diffDays >= 85 && diffDays <= 95) {
+          durationText = "3 Months";
+          termText = "3 months";
+        } else if (diffDays >= 175 && diffDays <= 185) {
+          durationText = "6 Months";
+          termText = "6 months";
+        } else if (diffDays >= 360 && diffDays <= 370) {
+          durationText = "12 Months";
+          termText = "12 months";
+        } else {
+          durationText = `${diffDays} Days`;
+          termText = `${diffDays} day(s)`;
+        }
+      }
+    }
+  }
+
+  let invoiceDiscount = 0;
+  if (payment?.notes) {
+    const matchDisc = payment.notes.match(/Discount\s*(?:Given)?:\s*₹?\s*(\d+)/i);
+    if (matchDisc && matchDisc[1]) {
+      invoiceDiscount = parseFloat(matchDisc[1]);
+    }
+  }
+
   const outstandingDues = parseFloat(member?.outstanding_dues !== undefined ? member.outstanding_dues : (payment?.outstanding_dues || 0));
   const isFullySettled = outstandingDues === 0;
   // PAY_LATER: subscription activated but ₹0 collected
@@ -193,7 +266,7 @@ function InvoicePrintContent() {
         ? !!payment.has_locker
         : !!(payment?.notes && payment.notes.toLowerCase().includes("locker")));
   const lockerNo = member?.locker_no || payment?.locker_no || "Standard Locker";
-  const lockerFee = hasLocker ? 50 : 0;
+  const lockerFee = hasLocker ? (planAmount > 50 ? 50 : 0) : 0;
   const seatPlanAmount = hasLocker ? Math.max(0, planAmount - lockerFee) : planAmount;
 
   // Promised Payment Due Date (if present)
@@ -475,7 +548,7 @@ function InvoicePrintContent() {
               <p>Initial Admission Date: <span className="font-bold text-slate-900 font-mono">{joiningDate}</span></p>
               <p>Subscription Start Date: <span className="font-bold text-indigo-700 font-mono">{subscriptionStartDate}</span></p>
               <p>Valid Till: <span className="font-bold text-slate-900 font-mono">{endDate}</span></p>
-              <p>Duration: <span className="font-bold text-slate-900 font-mono">1 Month</span></p>
+              <p>Duration: <span className="font-bold text-slate-900 font-mono">{durationText}</span></p>
             </div>
           </div>
         </div>
@@ -498,7 +571,7 @@ function InvoicePrintContent() {
                     High speed Wi-Fi, AC quiet study sanctuary access, reserved cabin desk workstation.
                   </p>
                 </td>
-                <td className="py-4 px-5 text-center font-semibold font-mono text-slate-700">1 month(s)</td>
+                <td className="py-4 px-5 text-center font-semibold font-mono text-slate-700">{termText}</td>
                 <td className="py-4 px-5 text-right font-bold font-mono text-slate-900 text-sm">₹{seatPlanAmount.toLocaleString()}.00</td>
               </tr>
               {hasLocker && (
@@ -512,7 +585,7 @@ function InvoicePrintContent() {
                       Dedicated secure personal storage locker facility allotment.
                     </p>
                   </td>
-                  <td className="py-3.5 px-5 text-center font-semibold font-mono text-slate-700">1 month(s)</td>
+                  <td className="py-3.5 px-5 text-center font-semibold font-mono text-slate-700">{termText}</td>
                   <td className="py-3.5 px-5 text-right font-bold font-mono text-emerald-700 text-xs">₹{lockerFee.toLocaleString()}.00</td>
                 </tr>
               )}
@@ -619,7 +692,7 @@ function InvoicePrintContent() {
             )}
             <div className="flex justify-between py-1 border-b border-slate-100">
               <span>Discount / Adjustment</span>
-              <span className="font-mono font-bold text-emerald-600">-₹0.00</span>
+              <span className="font-mono font-bold text-emerald-600">-₹{invoiceDiscount.toLocaleString()}.00</span>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-100">
               <span>Total Billing Amount</span>

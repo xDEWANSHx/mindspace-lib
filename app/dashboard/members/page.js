@@ -808,15 +808,29 @@ export default function MembersDirectoryPage() {
                   <div><span className="text-slate-400 font-medium block">Locker Assigned:</span> <p className="font-mono font-bold text-purple-700">{selectedMember.has_locker ? (selectedMember.locker_no || "Yes") : "No Locker"}</p></div>
                   {(() => {
                     const dates = getMemberSubscriptionDates(selectedMember, payments);
+                    let dynDuration = "1 Month";
+                    if (dates.subStart !== "--" && dates.subExpiry !== "--") {
+                      const d1 = new Date(dates.subStart);
+                      const d2 = new Date(dates.subExpiry);
+                      if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+                        const diffDays = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+                        if (diffDays === 15) dynDuration = "15 Days";
+                        else if (diffDays >= 28 && diffDays <= 31) dynDuration = "1 Month";
+                        else if (diffDays >= 85 && diffDays <= 95) dynDuration = "3 Months";
+                        else if (diffDays >= 175 && diffDays <= 185) dynDuration = "6 Months";
+                        else if (diffDays >= 360 && diffDays <= 370) dynDuration = "12 Months";
+                        else if (diffDays > 0) dynDuration = `${diffDays} Days`;
+                      }
+                    }
                     return (
                       <>
                         <div><span className="text-slate-400 font-medium block">Initial Admission Date:</span> <p className="font-mono font-bold text-slate-700">{dates.initialAdmissionDate}</p></div>
                         <div><span className="text-slate-400 font-medium block">Subscription Start Date:</span> <p className="font-mono font-bold text-indigo-600">{dates.subStart}</p></div>
                         <div><span className="text-slate-400 font-medium block">Subscription Expiry Date:</span> <p className="font-mono font-bold text-emerald-600">{dates.subExpiry}</p></div>
+                        <div><span className="text-slate-400 font-medium block">Duration:</span> <p className="font-mono font-bold text-slate-700">{dynDuration}</p></div>
                       </>
                     );
                   })()}
-                  <div><span className="text-slate-400 font-medium block">Duration:</span> <p className="font-mono font-bold text-slate-700">1 Month</p></div>
                   <div><span className="text-slate-400 font-medium block">Outstanding Dues:</span> <p className="font-mono font-bold text-amber-600">₹{selectedMember.outstanding_dues || 0}</p></div>
                   {selectedMember.outstanding_dues > 0 && (
                     <div><span className="text-slate-400 font-medium block">Promised Due Date:</span> <p className="font-mono font-black text-rose-600">{selectedMember.due_date || selectedMember.dues_due_date || "Not Set"}</p></div>

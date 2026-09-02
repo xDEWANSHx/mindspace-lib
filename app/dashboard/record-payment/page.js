@@ -148,15 +148,19 @@ function RecordPaymentContent() {
   }, [amountPaidToday, paymentMode]);
 
   useEffect(() => {
-    let storedPlanAmount = parseFloat(selectedMemberObj?.plan_amount || 1100);
-    if (selectedMemberObj?.shift === "Full Day" && storedPlanAmount === 600) {
-      storedPlanAmount = 1100;
-    }
     const fee = parseFloat(lockerFee || 50);
-    const baseShiftRate = selectedMemberObj?.has_locker ? Math.max(0, storedPlanAmount - fee) : storedPlanAmount;
-    const monthlyRate = includeLocker ? (baseShiftRate + fee) : baseShiftRate;
+    const isHalfDay = selectedMemberObj?.shift === "Morning" || selectedMemberObj?.shift === "Evening";
+    
+    // Exact standard shift rates: Full Day (1100 / 600) | Half Day (600 / 400)
+    const baseMonthlyRate = isHalfDay ? 600 : 1100;
+    const monthlyRate = includeLocker ? (baseMonthlyRate + fee) : baseMonthlyRate;
 
-    if (durationTab === "1M") {
+    const base15DayRate = isHalfDay ? 400 : 600;
+    const fifteenDayRate = includeLocker ? (base15DayRate + fee) : base15DayRate;
+
+    if (durationTab === "15D") {
+      setPlanFee(fifteenDayRate);
+    } else if (durationTab === "1M") {
       setPlanFee(monthlyRate);
     } else if (durationTab === "3M") {
       setPlanFee(monthlyRate * 3);
@@ -166,7 +170,7 @@ function RecordPaymentContent() {
       setPlanFee(monthlyRate * 12);
     }
     // In CUSTOM mode, planFee is managed directly by Admin's manual Net Payable input!
-  }, [durationTab, selectedMemberId, selectedMemberObj?.plan_amount, selectedMemberObj?.shift, selectedMemberObj?.has_locker, includeLocker, lockerFee]);
+  }, [durationTab, selectedMemberId, selectedMemberObj?.shift, includeLocker, lockerFee]);
 
   const parsedDiscount = Math.max(0, parseFloat(discountAmount || 0));
   const effectivePayable = Math.max(0, parseFloat(planFee || 0) - parsedDiscount);
@@ -183,10 +187,10 @@ function RecordPaymentContent() {
     } else if (paymentType === "PARTIAL") {
       setAmountPaidToday(Math.round(netPay / 2));
     } else if (paymentType === "COLLECT_DUES") {
-      setAmountPaidToday(selectedMemberObj?.outstanding_dues || 0);
+      setAmountPaidToday(netPay);
       setDiscountAmount(0);
     }
-  }, [paymentType, planFee, discountAmount, effectivePayable, selectedMemberObj?.outstanding_dues]);
+  }, [paymentType, planFee, discountAmount, effectivePayable, durationTab, selectedMemberObj?.outstanding_dues]);
 
   useEffect(() => {
     async function load() {
@@ -249,7 +253,7 @@ function RecordPaymentContent() {
       if (selectedMemberObj.outstanding_dues > 0) {
         setPaymentType("COLLECT_DUES");
         setAmountPaidToday(selectedMemberObj.outstanding_dues);
-        setJoiningDate(selectedMemberObj.joining_date || paidDate || formatDate(new Date()));
+        setJoiningDate(getDefaultSubStartDate(selectedMemberObj));
       } else {
         setPaymentType("FULL");
         setPlanFee(selectedMemberObj.plan_amount || 1100);
@@ -269,16 +273,18 @@ function RecordPaymentContent() {
   // Auto-calculated Expiry Date (Joining Date + Duration Days)
   const calculatedExpiryDate = useMemo(() => {
     if (!joiningDate) return "";
-    if (parseInt(extendDays) === 30 || extendDays === "30") {
+    if (durationTab === "1M" && (parseInt(extendDays) === 30 || extendDays === "30")) {
       return addOneMonth(joiningDate);
     }
-    return addDaysToDate(joiningDate, extendDays);
-  }, [joiningDate, extendDays]);
+    const days = parseInt(extendDays) || (durationTab === "15D" ? 15 : 30);
+    return addDaysToDate(joiningDate, days);
+  }, [joiningDate, extendDays, durationTab]);
 
   const finalExpiryDate = overrideExpiryDate || calculatedExpiryDate;
 
   // Auto-calculated Dues
   const currDues = selectedMemberObj?.outstanding_dues || 0;
+  const targetDues = effectivePayable;
   let calculatedNewDues = 0;
   if (paymentType === "FULL") {
     calculatedNewDues = 0;
@@ -287,7 +293,7 @@ function RecordPaymentContent() {
   } else if (paymentType === "PAY_LATER") {
     calculatedNewDues = Math.round(effectivePayable);
   } else if (paymentType === "COLLECT_DUES") {
-    calculatedNewDues = Math.max(0, Math.round(currDues - parseFloat(amountPaidToday || 0)));
+    calculatedNewDues = Math.max(0, Math.round(targetDues - parseFloat(amountPaidToday || 0)));
   }
 
   // Pending Dues Warning & Block Check
@@ -382,16 +388,17 @@ function RecordPaymentContent() {
     let defaultNote = "";
     let isRenewalAction = false;
 
+    const planDurationLabel = durationTab === "15D" ? "15 Days" : `${extendDays} days`;
     if (paymentType === "FULL") {
-      defaultNote = `Full Subscription Renewal (${extendDays} days)`;
+      defaultNote = `Full Subscription Renewal (${planDurationLabel})`;
       if (parsedDiscount > 0) defaultNote += ` [Discount Given: ₹${parsedDiscount}]`;
       isRenewalAction = true;
     } else if (paymentType === "PARTIAL") {
-      defaultNote = `Partial Payment (Paid ₹${parsedPaidToday} of ₹${effectivePayable}, ₹${calculatedNewDues} Dues Pending)`;
+      defaultNote = `Partial Payment (${planDurationLabel}, Paid ₹${parsedPaidToday} of ₹${effectivePayable}, ₹${calculatedNewDues} Dues Pending)`;
       if (parsedDiscount > 0) defaultNote += ` [Discount Given: ₹${parsedDiscount}]`;
       isRenewalAction = true;
     } else if (paymentType === "PAY_LATER") {
-      defaultNote = `Pay Later Deferred Activation (${extendDays} days plan, ₹${calculatedNewDues} Total Overdue Dues)`;
+      defaultNote = `Pay Later Deferred Activation (${planDurationLabel} plan, ₹${calculatedNewDues} Total Overdue Dues)`;
       if (parsedDiscount > 0) defaultNote += ` [Discount Given: ₹${parsedDiscount}]`;
       isRenewalAction = true;
     } else if (paymentType === "COLLECT_DUES") {
@@ -1027,7 +1034,13 @@ function RecordPaymentContent() {
                   </div>
                   <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 pt-1 border-t border-slate-200/60">
                     <span>
-                      {overrideExpiryDate ? "✏️ Custom Expiry Date Set Manually" : "✨ Auto-calculated (Month-to-Month Cycle)"}
+                      {overrideExpiryDate
+                        ? "✏️ Custom Expiry Date Set Manually"
+                        : durationTab === "15D"
+                        ? "✨ Auto-calculated (15 Days Cycle)"
+                        : durationTab === "CUSTOM"
+                        ? `✨ Auto-calculated (${extendDays} Days Custom)`
+                        : "✨ Auto-calculated (Month-to-Month Cycle)"}
                     </span>
                     <span className="font-mono text-cyan-800 font-extrabold">
                       Active Period: {joiningDate} → {finalExpiryDate}
@@ -1037,62 +1050,110 @@ function RecordPaymentContent() {
 
                 {/* Duration Tabs */}
                 <div>
-                  <label className="text-slate-500 font-bold mb-1.5 block">SELECT MEMBERSHIP DURATION</label>
-                  <div className="grid grid-cols-5 gap-2">
-                    {["1M", "3M", "6M", "12M", "CUSTOM"].map((tab) => (
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-slate-500 font-bold block text-xs">SELECT MEMBERSHIP DURATION</label>
+                    <span className="text-[10px] font-mono text-cyan-800 font-bold bg-cyan-50 border border-cyan-200 px-2.5 py-0.5 rounded-full">
+                      {durationTab === "15D"
+                        ? "15 Days Plan"
+                        : durationTab === "CUSTOM"
+                        ? `Custom (${extendDays} Days)`
+                        : `${extendDays} Days`}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                    {[
+                      { id: "15D", label: "15 Days", days: 15 },
+                      { id: "1M", label: "1M", days: 30 },
+                      { id: "3M", label: "3M", days: 90 },
+                      { id: "6M", label: "6M", days: 180 },
+                      { id: "12M", label: "12M", days: 365 },
+                      { id: "CUSTOM", label: "CUSTOM", days: extendDays || 1 }
+                    ].map((tab) => (
                       <button
-                        key={tab}
+                        key={tab.id}
                         type="button"
                         onClick={() => {
-                          setDurationTab(tab);
+                          setDurationTab(tab.id);
                           setOverrideExpiryDate("");
-                          if (paymentType === "COLLECT_DUES") {
-                            setPaymentType("FULL");
+                          if (tab.id !== "CUSTOM") {
+                            setExtendDays(tab.days);
                           }
-                          if (tab === "1M") setExtendDays(30);
-                          else if (tab === "3M") setExtendDays(90);
-                          else if (tab === "6M") setExtendDays(180);
-                          else if (tab === "12M") setExtendDays(365);
                         }}
-                        className={`py-2 rounded-2xl font-black text-xs transition-all cursor-pointer ${
-                          durationTab === tab
-                            ? "bg-slate-900 text-white shadow-md"
+                        className={`py-2.5 rounded-2xl font-black text-xs transition-all text-center cursor-pointer ${
+                          durationTab === tab.id
+                            ? "bg-slate-900 text-white shadow-md scale-[1.02]"
                             : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
                         }`}
                       >
-                        {tab}
+                        {tab.label}
                       </button>
                     ))}
                   </div>
                 </div>
 
                 {durationTab === "CUSTOM" && (
-                  <div className="bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200 space-y-2 animate-fadeIn">
+                  <div className="bg-gradient-to-r from-amber-50 to-orange-50/70 p-4 rounded-2xl border-2 border-amber-300 space-y-3 animate-fadeIn shadow-sm">
                     <div className="flex items-center justify-between">
-                      <label className="text-amber-900 font-extrabold text-xs flex items-center gap-1.5">
-                        <Edit3 className="w-3.5 h-3.5 text-amber-600" />
-                        <span>Custom Duration & Custom Net Payable</span>
+                      <label className="text-amber-950 font-black text-xs flex items-center gap-1.5">
+                        <Edit3 className="w-4 h-4 text-amber-600" />
+                        <span>CUSTOM DURATION & PRICING (FLEXIBLE DAYS)</span>
                       </label>
-                      <span className="text-[10px] text-amber-800 font-bold">Admin Adjustable Amount</span>
+                      <span className="text-[10px] text-amber-900 font-bold bg-amber-200/80 px-2.5 py-0.5 rounded-md border border-amber-300">
+                        Enter any days (1, 2, 3...) & custom rate
+                      </span>
                     </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[10px] font-bold text-amber-900 block mb-1">Extension Days:</label>
-                        <input
-                          type="number"
-                          value={extendDays}
-                          onChange={(e) => setExtendDays(parseInt(e.target.value) || 30)}
-                          className="w-full bg-white border border-amber-300 rounded-xl p-2 text-xs font-bold text-slate-800 font-mono outline-none"
-                        />
+                        <label className="text-[11px] font-bold text-amber-950 block mb-1">
+                          Number of Days: <span className="text-slate-500 font-normal font-mono">({joiningDate} + {extendDays || 0}d = {finalExpiryDate})</span>
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="1"
+                            value={extendDays}
+                            onChange={(e) => {
+                              const days = Math.max(1, parseInt(e.target.value) || 1);
+                              setExtendDays(days);
+                            }}
+                            className="w-full bg-white border border-amber-300 rounded-xl p-2.5 text-xs font-black text-slate-900 font-mono outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-200 shadow-inner"
+                            placeholder="e.g. 1, 2, 7, 10, 45..."
+                          />
+                          <div className="flex gap-1 shrink-0">
+                            {[1, 2, 3, 7, 10, 15].map(d => (
+                              <button
+                                key={d}
+                                type="button"
+                                onClick={() => setExtendDays(d)}
+                                className={`px-2 py-1.5 rounded-lg text-[10px] font-bold border cursor-pointer ${
+                                  extendDays === d
+                                    ? "bg-amber-600 text-white border-amber-600 shadow-sm"
+                                    : "bg-white text-amber-900 border-amber-200 hover:bg-amber-100"
+                                }`}
+                              >
+                                {d}d
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
+
                       <div>
-                        <label className="text-[10px] font-bold text-amber-900 block mb-1">Net Payable Amount (₹):</label>
-                        <input
-                          type="number"
-                          value={planFee}
-                          onChange={(e) => setPlanFee(parseFloat(e.target.value || 0))}
-                          className="w-full bg-white border-2 border-emerald-500 rounded-xl p-2 text-xs font-black text-emerald-950 font-mono outline-none focus:border-emerald-700"
-                        />
+                        <label className="text-[11px] font-bold text-amber-950 block mb-1">
+                          Custom Plan Fee / Net Payable (₹):
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-emerald-700 font-black text-sm">₹</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={planFee}
+                            onChange={(e) => setPlanFee(parseFloat(e.target.value || 0))}
+                            className="w-full bg-white border-2 border-emerald-500 rounded-xl p-2.5 text-xs font-black text-emerald-950 font-mono outline-none focus:border-emerald-700 shadow-inner"
+                            placeholder="Custom price (e.g. 200, 400, 750...)"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
