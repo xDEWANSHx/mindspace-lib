@@ -51,8 +51,20 @@ export default function AnalyticsInsightsPage() {
   const monthPayments = payments.filter(p => p.paid_at && p.paid_at.substring(0, 7) === selectedMonth);
   const monthExpensesList = expenses.filter(e => e.expense_date && e.expense_date.substring(0, 7) === selectedMonth);
 
-  const cashRevenue = monthPayments.filter(p => p.payment_mode === "Cash").reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
-  const onlineRevenue = monthPayments.filter(p => ["Online", "UPI", "Card"].includes(p.payment_mode)).reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+  const cashRevenue = monthPayments.reduce((sum, p) => {
+    if (p.payment_mode === "Cash") return sum + parseFloat(p.amount || 0);
+    if (p.payment_mode === "Split") return sum + parseFloat(p.cash_amount || 0);
+    return sum;
+  }, 0);
+
+  const onlineRevenue = monthPayments.reduce((sum, p) => {
+    if (p.payment_mode === "Split") return sum + parseFloat(p.online_amount || 0);
+    if (["Online", "UPI", "Card"].includes(p.payment_mode) || (p.payment_mode && p.payment_mode !== "Cash" && p.payment_mode !== "Deferred")) {
+      return sum + parseFloat(p.amount || 0);
+    }
+    return sum;
+  }, 0);
+
   const totalRevenue = cashRevenue + onlineRevenue;
 
   const totalExpenseAmt = monthExpensesList.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);

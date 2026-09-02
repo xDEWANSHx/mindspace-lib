@@ -74,9 +74,9 @@ function RecordPaymentContent() {
   const [planFee, setPlanFee] = useState(1100); // Base Plan Cost
   const [discountAmount, setDiscountAmount] = useState(0); // Current Month Discount
   const [amountPaidToday, setAmountPaidToday] = useState(1100); // Actual Cash/Online collected today
-  const [paymentMode, setPaymentMode] = useState("UPI"); // Cash | Online | Split
-  const [cashAmount, setCashAmount] = useState(500);
-  const [onlineAmount, setOnlineAmount] = useState(500);
+  const [paymentMode, setPaymentMode] = useState("Cash"); // Cash | Online | Split
+  const [cashAmount, setCashAmount] = useState(550);
+  const [onlineAmount, setOnlineAmount] = useState(550);
   const [durationTab, setDurationTab] = useState("1M"); // 1M | 3M | 6M | 12M | CUSTOM
   const [extendDays, setExtendDays] = useState(30);
   const [notes, setNotes] = useState("");
@@ -135,9 +135,10 @@ function RecordPaymentContent() {
   useEffect(() => {
     if (paymentMode === "Split") {
       const total = parseFloat(amountPaidToday) || 0;
-      const c = parseFloat(cashAmount) || 0;
-      if (cashAmount !== "" && c <= total && c > 0) {
-        setOnlineAmount(total - c);
+      const c = parseFloat(cashAmount);
+      const o = parseFloat(onlineAmount);
+      if (!isNaN(c) && !isNaN(o) && c >= 0 && o >= 0 && (c + o === total) && (cashAmount !== "" && onlineAmount !== "")) {
+        // Already accurately split
       } else {
         const half = Math.round(total / 2);
         setCashAmount(half);
@@ -302,7 +303,7 @@ function RecordPaymentContent() {
       member_name: selectedMemberObj.full_name,
       amount: payload.parsedPaidToday,
       branch: activeBranch,
-      payment_mode: payload.parsedPaidToday === 0 ? "Deferred" : paymentMode,
+      payment_mode: payload.parsedPaidToday === 0 ? "Deferred" : payload.paymentMode,
       cash_amount: payload.cPart,
       online_amount: payload.oPart,
       notes: payload.finalNote + payload.lockerNoteTag,
@@ -414,6 +415,7 @@ function RecordPaymentContent() {
       parsedPaidToday,
       cPart,
       oPart,
+      paymentMode,
       finalNote,
       lockerNoteTag,
       isRenewalAction,
@@ -1273,7 +1275,7 @@ function RecordPaymentContent() {
                   <label className="text-slate-500 font-bold block">PAYMENT MODE FOR TODAY'S DEPOSIT</label>
                   <div className="grid grid-cols-3 gap-3">
                     {[
-                      { id: "UPI", label: "Cash (Full Cash)" },
+                      { id: "Cash", label: "Cash (Full Cash)" },
                       { id: "Online", label: "Online / UPI" },
                       { id: "Split", label: "Split (Cash + Online)" }
                     ].map((mode) => (
@@ -1610,6 +1612,14 @@ function RecordPaymentContent() {
                   <span>{successPayment?.amount === 0 ? "Dues Pending:" : "Amount Paid Today:"}</span>
                   <span className={`font-mono text-sm font-black ${successPayment?.amount === 0 ? "text-amber-600" : "text-emerald-600"}`}>
                     {successPayment?.amount === 0 ? `₹${selectedMemberObj?.outstanding_dues || "—"}` : `₹${successPayment.amount}`}
+                  </span>
+                </div>
+                <div className="flex justify-between text-slate-600 font-bold">
+                  <span>Payment Mode:</span>
+                  <span className="text-cyan-700 font-bold">
+                    {successPayment.payment_mode === "Split"
+                      ? `Split (Cash ₹${successPayment.cash_amount} + Online ₹${successPayment.online_amount})`
+                      : successPayment.payment_mode}
                   </span>
                 </div>
                 <div className="flex justify-between text-slate-600 font-bold">
