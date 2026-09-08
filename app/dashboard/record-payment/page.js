@@ -31,7 +31,6 @@ import {
   recordPayment,
   deletePayment,
   updateMember,
-  updatePaymentRecord,
   formatDate,
   addOneMonth,
   subtractOneMonth,
@@ -188,7 +187,7 @@ function RecordPaymentContent() {
     } else if (paymentType === "PARTIAL") {
       setAmountPaidToday(Math.round(netPay / 2));
     } else if (paymentType === "COLLECT_DUES") {
-      setAmountPaidToday(selectedMemberObj?.outstanding_dues || 0);
+      setAmountPaidToday(netPay);
       setDiscountAmount(0);
     }
   }, [paymentType, planFee, discountAmount, effectivePayable, durationTab, selectedMemberObj?.outstanding_dues]);
@@ -226,14 +225,8 @@ function RecordPaymentContent() {
         });
         const topMem = sortedList[0];
         setSelectedMemberId(topMem.id);
-        if (topMem.outstanding_dues > 0) {
-          setPaymentType("COLLECT_DUES");
-          setAmountPaidToday(topMem.outstanding_dues);
-        } else {
-          setPaymentType("FULL");
-          setPlanFee(topMem.plan_amount || 1100);
-          setAmountPaidToday(topMem.plan_amount || 1100);
-        }
+        setPlanFee(topMem.plan_amount || 1100);
+        setAmountPaidToday(topMem.plan_amount || 1100);
       }
     }
     load();
@@ -244,9 +237,8 @@ function RecordPaymentContent() {
 
   const getDefaultSubStartDate = (m) => {
     if (!m) return paidDate || formatDate(new Date());
-    const todayStr = formatDate(new Date());
     const hasValidSub = m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970");
-    if (hasValidSub && m.subscription_end_date >= todayStr) {
+    if (hasValidSub) {
       return addDaysToDate(m.subscription_end_date, 1);
     }
     return m.joining_date || paidDate || formatDate(new Date());
@@ -261,7 +253,7 @@ function RecordPaymentContent() {
       if (selectedMemberObj.outstanding_dues > 0) {
         setPaymentType("COLLECT_DUES");
         setAmountPaidToday(selectedMemberObj.outstanding_dues);
-        setJoiningDate(selectedMemberObj.joining_date || formatDate(new Date()));
+        setJoiningDate(getDefaultSubStartDate(selectedMemberObj));
       } else {
         setPaymentType("FULL");
         setPlanFee(selectedMemberObj.plan_amount || 1100);
@@ -273,12 +265,8 @@ function RecordPaymentContent() {
 
   // Adjust joining date when switching paymentType
   useEffect(() => {
-    if (selectedMemberObj) {
-      if (paymentType === "COLLECT_DUES") {
-        setJoiningDate(selectedMemberObj.joining_date || formatDate(new Date()));
-      } else {
-        setJoiningDate(getDefaultSubStartDate(selectedMemberObj));
-      }
+    if (selectedMemberObj && paymentType !== "COLLECT_DUES") {
+      setJoiningDate(getDefaultSubStartDate(selectedMemberObj));
     }
   }, [paymentType]);
 
@@ -296,6 +284,7 @@ function RecordPaymentContent() {
 
   // Auto-calculated Dues
   const currDues = selectedMemberObj?.outstanding_dues || 0;
+  const targetDues = effectivePayable;
   let calculatedNewDues = 0;
   if (paymentType === "FULL") {
     calculatedNewDues = 0;
@@ -304,11 +293,13 @@ function RecordPaymentContent() {
   } else if (paymentType === "PAY_LATER") {
     calculatedNewDues = Math.round(effectivePayable);
   } else if (paymentType === "COLLECT_DUES") {
-    calculatedNewDues = Math.max(0, Math.round(currDues - parseFloat(amountPaidToday || 0)));
+    calculatedNewDues = Math.max(0, Math.round(targetDues - parseFloat(amountPaidToday || 0)));
   }
 
-  // Pending Dues Info
+  // Pending Dues Warning & Block Check
   const hasPendingDues = currDues > 0;
+  const isTryingNextMonthPayment = paymentType === "FULL" || paymentType === "PARTIAL" || paymentType === "PAY_LATER";
+  const isDuesBlocked = hasPendingDues && isTryingNextMonthPayment;
 
   const executePaymentRecord = async (payload) => {
     if (!selectedMemberObj) return;
@@ -356,6 +347,11 @@ function RecordPaymentContent() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedMemberObj) return;
+
+    if (isDuesBlocked) {
+      alert(`Student ${selectedMemberObj.full_name} has pending dues of ₹${currDues}. You cannot record a next month subscription payment until previous dues are cleared! Please use 'Collect Dues' scheme first.`);
+      return;
+    }
 
     const parsedPaidToday = parseFloat(amountPaidToday) || 0;
     const parsedPlanFee = parseFloat(planFee) || 0;
@@ -481,29 +477,20 @@ function RecordPaymentContent() {
       setManagedStudent(target);
       const joinStr = target.joining_date || formatDate(new Date());
       const dates = getMemberSubscriptionDates(target, payments);
-      const subStartVal = dates.subStart !== "--" ? dates.subStart : joinStr;
-      const subExpiryVal = (target.subscription_end_date && !String(target.subscription_end_date).startsWith("1970")) ? target.subscription_end_date : (dates.subExpiry !== "--" ? dates.subExpiry : (subStartVal ? addOneMonth(subStartVal) : ""));
-
-      let normalizedShift = "Full Day";
-      if (String(target.shift || "").toLowerCase().includes("morning")) {
-        normalizedShift = "Morning";
-      } else if (String(target.shift || "").toLowerCase().includes("evening")) {
-        normalizedShift = "Evening";
-      } else if (String(target.shift || "").toLowerCase().includes("full")) {
-        normalizedShift = "Full Day";
-      }
+      const subStartVal = dates.subStart !== "--" ? dates.subStart : "";
+      const subExpiryVal = (target.subscription_end_date && !String(target.subscription_end_date).startsWith("1970")) ? target.subscription_end_date : (dates.subExpiry !== "--" ? dates.subExpiry : "");
 
       setEditFormData({
         full_name: target.full_name || "",
         mobile: target.mobile || "",
-        shift: normalizedShift,
+        shift: target.shift || "Full Day",
         seat_no: target.seat_no || "",
         joining_date: joinStr,
         sub_start_date: subStartVal,
         subscription_end_date: subExpiryVal,
-        plan_amount: target.plan_amount !== undefined ? target.plan_amount : (normalizedShift === "Full Day" ? 1100 : 600),
-        outstanding_dues: target.outstanding_dues !== undefined ? target.outstanding_dues : 0,
-        payment_status: target.payment_status || (target.outstanding_dues > 0 ? (target.outstanding_dues < (target.plan_amount || 1100) ? "PARTIAL" : "UNPAID") : "PAID")
+        plan_amount: target.plan_amount || 1100,
+        outstanding_dues: target.outstanding_dues || 0,
+        payment_status: target.outstanding_dues > 0 ? (target.outstanding_dues < (target.plan_amount || 1100) ? "PARTIAL" : "UNPAID") : "PAID"
       });
       setManageStudentModalOpen(true);
     } else {
@@ -515,17 +502,21 @@ function RecordPaymentContent() {
     e.preventDefault();
     if (!managedStudent) return;
 
-    const finalPlanAmount = parseFloat(editFormData.plan_amount !== undefined && editFormData.plan_amount !== "" ? editFormData.plan_amount : (editFormData.shift === "Full Day" ? 1100 : 600));
-    const updatedDues = parseFloat(editFormData.outstanding_dues !== undefined && editFormData.outstanding_dues !== "" ? editFormData.outstanding_dues : 0);
-    const newStartDate = editFormData.sub_start_date || editFormData.joining_date || managedStudent.joining_date || formatDate(new Date());
-    const finalSubEnd = editFormData.subscription_end_date || (newStartDate ? addOneMonth(newStartDate) : managedStudent.subscription_end_date);
+    let finalPlanAmount = parseFloat(editFormData.plan_amount || 1100);
+    if (editFormData.shift === "Full Day" && (finalPlanAmount === 600 || !editFormData.plan_amount)) {
+      finalPlanAmount = 1100;
+    }
+
+    const updatedDues = parseFloat(editFormData.outstanding_dues || 0);
+    const joinStr = editFormData.joining_date || managedStudent.joining_date || formatDate(new Date());
+    const finalSubEnd = editFormData.subscription_end_date || (editFormData.sub_start_date ? addOneMonth(editFormData.sub_start_date) : null);
 
     await updateMember(managedStudent.id, {
       full_name: editFormData.full_name,
       mobile: editFormData.mobile,
       shift: editFormData.shift,
       seat_no: editFormData.seat_no ? editFormData.seat_no : null,
-      joining_date: newStartDate,
+      joining_date: joinStr,
       subscription_end_date: finalSubEnd,
       plan_amount: finalPlanAmount,
       outstanding_dues: updatedDues,
@@ -533,14 +524,11 @@ function RecordPaymentContent() {
     });
 
     const memPayments = payments.filter(p =>
-      (p.member_id === managedStudent.id ||
+      p.member_id === managedStudent.id ||
       p.member_id === managedStudent.permanent_id ||
       p.member_id === managedStudent.student_no ||
-      (p.member_name && managedStudent.full_name && p.member_name.trim().toLowerCase() === managedStudent.full_name.trim().toLowerCase())) &&
-      !String(p.notes || "").toLowerCase().includes("pending dues recovery") &&
-      !String(p.notes || "").toLowerCase().includes("loss settlement")
+      (p.member_name && managedStudent.full_name && p.member_name.trim().toLowerCase() === managedStudent.full_name.trim().toLowerCase())
     );
-
     if (memPayments.length > 0) {
       memPayments.sort((a, b) => {
         const tA = a.paid_at ? new Date(a.paid_at).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
@@ -549,11 +537,11 @@ function RecordPaymentContent() {
       });
       const latestP = memPayments[0];
       let updatedNotes = latestP.notes || "";
-      if (newStartDate) {
+      if (editFormData.sub_start_date) {
         if (updatedNotes.includes("Start Date:")) {
-          updatedNotes = updatedNotes.replace(/Start Date:\s*\d{4}-\d{2}-\d{2}/i, `Start Date: ${newStartDate}`);
+          updatedNotes = updatedNotes.replace(/Start Date:\s*\d{4}-\d{2}-\d{2}/i, `Start Date: ${editFormData.sub_start_date}`);
         } else {
-          updatedNotes += ` — Start Date: ${newStartDate}`;
+          updatedNotes += ` — Start Date: ${editFormData.sub_start_date}`;
         }
       }
       if (finalSubEnd && !String(finalSubEnd).startsWith("1970")) {
@@ -563,13 +551,12 @@ function RecordPaymentContent() {
           updatedNotes += `, Expiry: ${finalSubEnd}`;
         }
       }
-      const paymentDateVal = newStartDate ? (newStartDate.includes('T') ? newStartDate : `${newStartDate}T12:00:00.000Z`) : latestP.paid_at;
-      await updatePaymentRecord(latestP.id, {
-        member_name: editFormData.full_name || latestP.member_name,
-        notes: updatedNotes,
-        paid_at: paymentDateVal,
-        skipMemberSync: true
-      });
+      try {
+        await supabase.from('payments').update({
+          member_name: editFormData.full_name || latestP.member_name,
+          notes: updatedNotes
+        }).eq('id', latestP.id);
+      } catch (err) {}
     }
 
     setManageStudentModalOpen(false);
@@ -956,22 +943,29 @@ function RecordPaymentContent() {
                 </div>
               </div>
 
-              {/* PENDING DUES INFO BANNER */}
-              {hasPendingDues && paymentType !== "COLLECT_DUES" && (
-                <div className="bg-amber-50 border border-amber-300 rounded-2xl p-3.5 flex items-center justify-between text-xs text-amber-900 shadow-sm animate-fadeIn">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>
-                      Student has previous unpaid dues of <strong className="font-mono font-black text-amber-950">₹{currDues}</strong>.
-                    </span>
+              {/* PENDING DUES BLOCK WARNING BANNER */}
+              {isDuesBlocked && (
+                <div className="bg-rose-50 border-2 border-rose-300 rounded-3xl p-5 flex items-start gap-3.5 text-xs text-rose-900 shadow-sm animate-fadeIn">
+                  <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h4 className="font-black text-rose-950 text-sm">
+                      Pending Dues Clear Required!
+                    </h4>
+                    <p className="text-rose-800 font-medium leading-relaxed">
+                      Student <strong className="text-rose-950">{selectedMemberObj?.full_name}</strong> has previous unpaid dues of <strong className="font-mono text-rose-950 font-black">₹{currDues}</strong>.
+                      You cannot record or activate next month&apos;s subscription payment until previous dues are cleared!
+                    </p>
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentType("COLLECT_DUES")}
+                        className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                      >
+                        <DollarSign className="w-4 h-4" />
+                        <span>Click Here to Collect ₹{currDues} Dues First</span>
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setPaymentType("COLLECT_DUES")}
-                    className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] shadow-sm transition-all cursor-pointer shrink-0"
-                  >
-                    Collect ₹{currDues} Dues Instead
-                  </button>
                 </div>
               )}
 
@@ -1084,9 +1078,6 @@ function RecordPaymentContent() {
                           if (tab.id !== "CUSTOM") {
                             setExtendDays(tab.days);
                           }
-                          if (paymentType === "COLLECT_DUES") {
-                            setPaymentType("FULL");
-                          }
                         }}
                         className={`py-2.5 rounded-2xl font-black text-xs transition-all text-center cursor-pointer ${
                           durationTab === tab.id
@@ -1100,75 +1091,76 @@ function RecordPaymentContent() {
                   </div>
                 </div>
 
-                  {durationTab === "CUSTOM" && (
-                    <div className="bg-gradient-to-r from-amber-50 to-orange-50/70 p-4 rounded-2xl border-2 border-amber-300 space-y-3 animate-fadeIn shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <label className="text-amber-950 font-black text-xs flex items-center gap-1.5">
-                          <Edit3 className="w-4 h-4 text-amber-600" />
-                          <span>CUSTOM DURATION & PRICING (FLEXIBLE DAYS)</span>
-                        </label>
-                        <span className="text-[10px] text-amber-900 font-bold bg-amber-200/80 px-2.5 py-0.5 rounded-md border border-amber-300">
-                          Enter any days (1, 2, 3...) & custom rate
-                        </span>
-                      </div>
+                {durationTab === "CUSTOM" && (
+                  <div className="bg-gradient-to-r from-amber-50 to-orange-50/70 p-4 rounded-2xl border-2 border-amber-300 space-y-3 animate-fadeIn shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <label className="text-amber-950 font-black text-xs flex items-center gap-1.5">
+                        <Edit3 className="w-4 h-4 text-amber-600" />
+                        <span>CUSTOM DURATION & PRICING (FLEXIBLE DAYS)</span>
+                      </label>
+                      <span className="text-[10px] text-amber-900 font-bold bg-amber-200/80 px-2.5 py-0.5 rounded-md border border-amber-300">
+                        Enter any days (1, 2, 3...) & custom rate
+                      </span>
+                    </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[11px] font-bold text-amber-950 block mb-1">
-                            Number of Days: <span className="text-slate-500 font-normal font-mono">({joiningDate} + {extendDays || 0}d = {finalExpiryDate})</span>
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              min="1"
-                              value={extendDays}
-                              onChange={(e) => {
-                                const days = Math.max(1, parseInt(e.target.value) || 1);
-                                setExtendDays(days);
-                              }}
-                              className="w-full bg-white border border-amber-300 rounded-xl p-2.5 text-xs font-black text-slate-900 font-mono outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-200 shadow-inner"
-                              placeholder="e.g. 1, 2, 7, 10, 45..."
-                            />
-                            <div className="flex gap-1 shrink-0">
-                              {[1, 2, 3, 7, 10, 15].map(d => (
-                                <button
-                                  key={d}
-                                  type="button"
-                                  onClick={() => setExtendDays(d)}
-                                  className={`px-2 py-1.5 rounded-lg text-[10px] font-bold border cursor-pointer ${
-                                    extendDays === d
-                                      ? "bg-amber-600 text-white border-amber-600 shadow-sm"
-                                      : "bg-white text-amber-900 border-amber-200 hover:bg-amber-100"
-                                  }`}
-                                >
-                                  {d}d
-                                </button>
-                              ))}
-                            </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] font-bold text-amber-950 block mb-1">
+                          Number of Days: <span className="text-slate-500 font-normal font-mono">({joiningDate} + {extendDays || 0}d = {finalExpiryDate})</span>
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="1"
+                            value={extendDays}
+                            onChange={(e) => {
+                              const days = Math.max(1, parseInt(e.target.value) || 1);
+                              setExtendDays(days);
+                            }}
+                            className="w-full bg-white border border-amber-300 rounded-xl p-2.5 text-xs font-black text-slate-900 font-mono outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-200 shadow-inner"
+                            placeholder="e.g. 1, 2, 7, 10, 45..."
+                          />
+                          <div className="flex gap-1 shrink-0">
+                            {[1, 2, 3, 7, 10, 15].map(d => (
+                              <button
+                                key={d}
+                                type="button"
+                                onClick={() => setExtendDays(d)}
+                                className={`px-2 py-1.5 rounded-lg text-[10px] font-bold border cursor-pointer ${
+                                  extendDays === d
+                                    ? "bg-amber-600 text-white border-amber-600 shadow-sm"
+                                    : "bg-white text-amber-900 border-amber-200 hover:bg-amber-100"
+                                }`}
+                              >
+                                {d}d
+                              </button>
+                            ))}
                           </div>
                         </div>
+                      </div>
 
-                        <div>
-                          <label className="text-[11px] font-bold text-amber-950 block mb-1">
-                            Custom Plan Fee / Net Payable (₹):
-                          </label>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-emerald-700 font-black text-sm">₹</span>
-                            <input
-                              type="number"
-                              min="0"
-                              value={planFee}
-                              onChange={(e) => setPlanFee(parseFloat(e.target.value || 0))}
-                              className="w-full bg-white border-2 border-emerald-500 rounded-xl p-2.5 text-xs font-black text-emerald-950 font-mono outline-none focus:border-emerald-700 shadow-inner"
-                              placeholder="Custom price (e.g. 200, 400, 750...)"
-                            />
-                          </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-amber-950 block mb-1">
+                          Custom Plan Fee / Net Payable (₹):
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-emerald-700 font-black text-sm">₹</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={planFee}
+                            onChange={(e) => setPlanFee(parseFloat(e.target.value || 0))}
+                            className="w-full bg-white border-2 border-emerald-500 rounded-xl p-2.5 text-xs font-black text-emerald-950 font-mono outline-none focus:border-emerald-700 shadow-inner"
+                            placeholder="Custom price (e.g. 200, 400, 750...)"
+                          />
                         </div>
                       </div>
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {/* DISCOUNT SECTION (Current Month Discount) */}
+                {/* DISCOUNT SECTION (Current Month Discount) */}
+                {paymentType !== "COLLECT_DUES" && (
                   <div className="bg-cyan-50/70 p-4 rounded-2xl border border-cyan-200/90 space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-slate-800 font-extrabold text-xs flex items-center gap-1.5">
@@ -1211,74 +1203,75 @@ function RecordPaymentContent() {
                       </div>
                     </div>
                   </div>
+                )}
 
-                  {/* LOCKER FACILITY MANAGEMENT (ADD / REMOVE) */}
-                  <div className="bg-purple-50/70 p-4 rounded-2xl border border-purple-200/90 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Lock className="w-4 h-4 text-purple-600 shrink-0" />
-                        <div>
-                          <span className="font-extrabold text-slate-900 text-xs block">Locker Facility Status</span>
-                          <span className="text-[10px] text-slate-500 font-medium">
-                            {includeLocker
-                              ? `Locker Active (${selectedMemberObj?.locker_no || "Assigned"})`
-                              : "No Locker assigned for next period"}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <button
-                        type="button"
-                        onClick={() => setIncludeLocker(prev => !prev)}
-                        className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
-                          includeLocker
-                            ? "bg-purple-600 text-white shadow-md hover:bg-purple-700"
-                            : "bg-white border border-purple-300 text-purple-800 hover:bg-purple-50"
-                        }`}
-                      >
-                        <Lock className="w-3.5 h-3.5" />
-                        <span>
+                {/* LOCKER FACILITY MANAGEMENT (ADD / REMOVE) */}
+                <div className="bg-purple-50/70 p-4 rounded-2xl border border-purple-200/90 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-purple-600 shrink-0" />
+                      <div>
+                        <span className="font-extrabold text-slate-900 text-xs block">Locker Facility Status</span>
+                        <span className="text-[10px] text-slate-500 font-medium">
                           {includeLocker
-                            ? `Locker Active (Click to Remove -₹${lockerFee})`
-                            : `+ Add Locker (+₹${lockerFee})`}
+                            ? `Locker Active (${selectedMemberObj?.locker_no || "Assigned"})`
+                            : "No Locker assigned for next period"}
                         </span>
-                      </button>
-                    </div>
-
-                    <div className="flex items-center justify-between text-[10px] font-bold pt-1 border-t border-purple-200/60">
-                      <span className={includeLocker ? "text-purple-900 font-black" : "text-slate-500 font-bold"}>
-                        {includeLocker ? "🔒 Locker Included for this Subscription" : "🔓 No Locker facility (Discontinued)"}
-                      </span>
-                      {selectedMemberObj?.has_locker !== includeLocker && (
-                        <span className={`px-2 py-0.5 rounded-md border text-[9px] font-black ${
-                          includeLocker
-                            ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                            : "bg-amber-100 text-amber-900 border-amber-300"
-                        }`}>
-                          {includeLocker ? "+ Locker will be added on saving" : "❌ Locker will be removed on saving"}
-                        </span>
-                      )}
-                    </div>
-
-                    {includeLocker && (
-                      <div className="flex items-center justify-between pt-1 border-t border-purple-200/60 animate-fadeIn">
-                        <label className="text-[11px] font-bold text-purple-900">Locker Fee Amount (₹):</label>
-                        <input
-                          type="number"
-                          value={lockerFee}
-                          onChange={(e) => {
-                            const newFee = parseFloat(e.target.value || 0);
-                            const oldFee = parseFloat(lockerFee || 0);
-                            const diff = newFee - oldFee;
-                            setLockerFee(newFee);
-                            setPlanFee(prev => Math.max(0, prev + diff));
-                          }}
-                          className="w-24 bg-white border border-purple-300 rounded-xl p-1.5 text-xs font-mono font-bold text-purple-900 outline-none focus:border-purple-600"
-                        />
                       </div>
+                    </div>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setIncludeLocker(prev => !prev)}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        includeLocker
+                          ? "bg-purple-600 text-white shadow-md hover:bg-purple-700"
+                          : "bg-white border border-purple-300 text-purple-800 hover:bg-purple-50"
+                      }`}
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>
+                        {includeLocker
+                          ? `Locker Active (Click to Remove -₹${lockerFee})`
+                          : `+ Add Locker (+₹${lockerFee})`}
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] font-bold pt-1 border-t border-purple-200/60">
+                    <span className={includeLocker ? "text-purple-900 font-black" : "text-slate-500 font-bold"}>
+                      {includeLocker ? "🔒 Locker Included for this Subscription" : "🔓 No Locker facility (Discontinued)"}
+                    </span>
+                    {selectedMemberObj?.has_locker !== includeLocker && (
+                      <span className={`px-2 py-0.5 rounded-md border text-[9px] font-black ${
+                        includeLocker
+                          ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                          : "bg-amber-100 text-amber-900 border-amber-300"
+                      }`}>
+                        {includeLocker ? "+ Locker will be added on saving" : "❌ Locker will be removed on saving"}
+                      </span>
                     )}
                   </div>
+
+                  {includeLocker && (
+                    <div className="flex items-center justify-between pt-1 border-t border-purple-200/60 animate-fadeIn">
+                      <label className="text-[11px] font-bold text-purple-900">Locker Fee Amount (₹):</label>
+                      <input
+                        type="number"
+                        value={lockerFee}
+                        onChange={(e) => {
+                          const newFee = parseFloat(e.target.value || 0);
+                          const oldFee = parseFloat(lockerFee || 0);
+                          const diff = newFee - oldFee;
+                          setLockerFee(newFee);
+                          setPlanFee(prev => Math.max(0, prev + diff));
+                        }}
+                        className="w-24 bg-white border border-purple-300 rounded-xl p-1.5 text-xs font-mono font-bold text-purple-900 outline-none focus:border-purple-600"
+                      />
+                    </div>
+                  )}
                 </div>
+              </div>
 
               {/* AMOUNT COLLECTED TODAY VS DUES BREAKDOWN */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1290,9 +1283,9 @@ function RecordPaymentContent() {
                     type="number"
                     value={amountPaidToday}
                     onChange={(e) => setAmountPaidToday(e.target.value)}
-                    disabled={paymentType === "PAY_LATER"}
+                    disabled={paymentType === "PAY_LATER" || isDuesBlocked}
                     className={`w-full border rounded-2xl p-3 outline-none font-extrabold font-mono text-sm ${
-                      paymentType === "PAY_LATER"
+                      paymentType === "PAY_LATER" || isDuesBlocked
                         ? "bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200"
                         : "bg-slate-50 text-slate-900 border-slate-200 focus:border-cyan-500"
                     }`}
@@ -1327,6 +1320,7 @@ function RecordPaymentContent() {
                     type="date"
                     value={promisedDueDate}
                     onChange={(e) => setPromisedDueDate(e.target.value)}
+                    disabled={isDuesBlocked}
                     className="w-full bg-white border border-amber-300 rounded-xl p-3 text-xs font-black text-amber-950 font-mono outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-200 shadow-inner"
                     required
                   />
@@ -1337,7 +1331,7 @@ function RecordPaymentContent() {
               )}
 
               {/* PAYMENT MODE SELECTOR (Only if collecting money today) */}
-              {parseFloat(amountPaidToday) > 0 && (
+              {parseFloat(amountPaidToday) > 0 && !isDuesBlocked && (
                 <div className="space-y-3">
                   <label className="text-slate-500 font-bold block">PAYMENT MODE FOR TODAY'S DEPOSIT</label>
                   <div className="grid grid-cols-3 gap-3">
@@ -1389,8 +1383,8 @@ function RecordPaymentContent() {
 
               {/* DATE PAID & NOTES */}
               {/* Date Paid is only shown when actual money is being collected (amount > 0) */}
-              <div className={`grid grid-cols-1 gap-4 ${parseFloat(amountPaidToday) > 0 ? "sm:grid-cols-2" : ""}`}>
-                {parseFloat(amountPaidToday) > 0 && (
+              <div className={`grid grid-cols-1 gap-4 ${parseFloat(amountPaidToday) > 0 && !isDuesBlocked ? "sm:grid-cols-2" : ""}`}>
+                {parseFloat(amountPaidToday) > 0 && !isDuesBlocked && (
                   <div>
                     <label className="text-slate-500 font-bold mb-1 block flex items-center justify-between">
                       <span>DATE PAID (COLLECTION DATE)</span>
@@ -1411,25 +1405,40 @@ function RecordPaymentContent() {
                     type="text"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
+                    disabled={isDuesBlocked}
                     placeholder="Optional transaction remarks..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none font-medium"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none font-medium disabled:opacity-50"
                   />
                 </div>
               </div>
 
               {/* SUBMIT BUTTON */}
-              <button
-                type="submit"
-                className="w-full py-4 rounded-2xl font-extrabold text-xs uppercase tracking-wider shadow-xl transition-all flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white shadow-slate-900/20 cursor-pointer"
-              >
-                <CreditCard className="w-4 h-4 text-cyan-400" />
-                <span>
-                  {paymentType === "FULL" && "Record Full Payment & Activate Plan"}
-                  {paymentType === "PARTIAL" && `Record Partial Payment (₹${amountPaidToday}) & Set ₹${calculatedNewDues} Dues`}
-                  {paymentType === "PAY_LATER" && `Activate Plan with Pay Later (₹${calculatedNewDues} Overdue Dues)`}
-                  {paymentType === "COLLECT_DUES" && `Collect ₹${amountPaidToday} Dues (${calculatedNewDues} Remaining)`}
-                </span>
-              </button>
+              {isDuesBlocked ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentType("COLLECT_DUES");
+                    setAmountPaidToday(currDues);
+                  }}
+                  className="w-full py-4 rounded-2xl font-extrabold text-xs uppercase tracking-wider shadow-xl transition-all flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 text-white cursor-pointer"
+                >
+                  <AlertTriangle className="w-4 h-4 text-white" />
+                  <span>Click Here to Switch & Collect ₹{currDues} Pending Dues Now</span>
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="w-full py-4 rounded-2xl font-extrabold text-xs uppercase tracking-wider shadow-xl transition-all flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white shadow-slate-900/20 cursor-pointer"
+                >
+                  <CreditCard className="w-4 h-4 text-cyan-400" />
+                  <span>
+                    {paymentType === "FULL" && "Record Full Payment & Activate Plan"}
+                    {paymentType === "PARTIAL" && `Record Partial Payment (₹${amountPaidToday}) & Set ₹${calculatedNewDues} Dues`}
+                    {paymentType === "PAY_LATER" && `Activate Plan with Pay Later (₹${calculatedNewDues} Overdue Dues)`}
+                    {paymentType === "COLLECT_DUES" && `Collect ₹${amountPaidToday} Dues (${calculatedNewDues} Remaining)`}
+                  </span>
+                </button>
+              )}
             </form>
           </div>
         </div>
@@ -1760,7 +1769,12 @@ function RecordPaymentContent() {
                     value={editFormData.shift}
                     onChange={(e) => {
                       const newShift = e.target.value;
-                      setEditFormData({ ...editFormData, shift: newShift });
+                      const oldBasePrice = editFormData.shift === "Full Day" ? 1100 : (editFormData.shift === "Morning" || editFormData.shift === "Evening" ? 600 : editFormData.plan_amount);
+                      const newBasePrice = newShift === "Full Day" ? 1100 : (newShift === "Morning" || newShift === "Evening" ? 600 : editFormData.plan_amount);
+                      const diff = newBasePrice - oldBasePrice;
+                      const currentDues = parseFloat(editFormData.outstanding_dues || 0);
+                      const newDues = Math.max(0, currentDues + diff);
+                      setEditFormData({ ...editFormData, shift: newShift, plan_amount: newBasePrice, outstanding_dues: newDues });
                     }}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-900 font-bold"
                   >

@@ -38,7 +38,6 @@ import {
   deletePayment,
   recordPayment,
   settleLossPayment,
-  updatePaymentRecord,
   calculateMemberStatus,
   seedFreshComprehensiveData,
   formatDate,
@@ -228,18 +227,8 @@ export default function MembersDirectoryPage() {
   // Action: Open Edit Modal with ALL FIELDS initialized
   const openEditModal = (m) => {
     const dates = getMemberSubscriptionDates(m, payments);
-    const joinStr = m.joining_date || formatDate(new Date());
-    const subStartVal = dates.subStart !== "--" ? dates.subStart : joinStr;
-    const subExpiryVal = (m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970")) ? m.subscription_end_date : (dates.subExpiry !== "--" ? dates.subExpiry : (subStartVal ? addOneMonth(subStartVal) : ""));
-
-    let normalizedShift = "Full Day";
-    if (String(m.shift || "").toLowerCase().includes("morning")) {
-      normalizedShift = "Morning";
-    } else if (String(m.shift || "").toLowerCase().includes("evening")) {
-      normalizedShift = "Evening";
-    } else if (String(m.shift || "").toLowerCase().includes("full")) {
-      normalizedShift = "Full Day";
-    }
+    const subStartVal = dates.subStart !== "--" ? dates.subStart : "";
+    const subExpiryVal = dates.subExpiry !== "--" ? dates.subExpiry : "";
 
     setEditData({
       full_name: m.full_name || "",
@@ -251,13 +240,13 @@ export default function MembersDirectoryPage() {
       address: m.address || "",
       aadhar_no: m.aadhar_no || "",
       targeting_exam: m.targeting_exam || "",
-      shift: normalizedShift,
+      shift: m.shift || "Full Day",
       seat_no: m.seat_no || "",
-      joining_date: joinStr,
+      joining_date: m.joining_date || "",
       sub_start_date: subStartVal,
       subscription_end_date: subExpiryVal,
-      plan_amount: m.plan_amount !== undefined ? m.plan_amount : (normalizedShift === "Full Day" ? 1100 : 600),
-      outstanding_dues: m.outstanding_dues !== undefined ? m.outstanding_dues : 0,
+      plan_amount: m.plan_amount !== undefined ? m.plan_amount : 1100,
+      outstanding_dues: m.outstanding_dues || 0,
       pay_later: m.pay_later || false,
       due_date: m.due_date || "",
       has_locker: m.has_locker || false,
@@ -276,8 +265,7 @@ export default function MembersDirectoryPage() {
     if (editData.shift === "Full Day" && (finalPlanAmt === 600 || !editData.plan_amount)) {
       finalPlanAmt = 1100;
     }
-    const newStartDate = editData.sub_start_date || editData.joining_date || selectedMember.joining_date || formatDate(new Date());
-    const finalSubEnd = editData.subscription_end_date || (newStartDate ? addOneMonth(newStartDate) : selectedMember.subscription_end_date);
+    const finalSubEnd = editData.subscription_end_date || (editData.sub_start_date ? addOneMonth(editData.sub_start_date) : selectedMember.subscription_end_date);
 
     const updates = {
       full_name: editData.full_name,
@@ -291,7 +279,7 @@ export default function MembersDirectoryPage() {
       targeting_exam: editData.targeting_exam,
       shift: editData.shift,
       seat_no: editData.seat_no ? editData.seat_no : null,
-      joining_date: newStartDate,
+      joining_date: editData.joining_date,
       subscription_end_date: finalSubEnd,
       plan_amount: finalPlanAmt,
       outstanding_dues: parseFloat(editData.outstanding_dues || 0),
@@ -306,12 +294,10 @@ export default function MembersDirectoryPage() {
 
     // Sync latest payment's member_name, start_date, end_date, and notes if edited
     const memPayments = payments.filter(p =>
-      (p.member_id === selectedMember.id ||
+      p.member_id === selectedMember.id ||
       p.member_id === selectedMember.permanent_id ||
       p.member_id === selectedMember.student_no ||
-      (p.member_name && selectedMember.full_name && p.member_name.trim().toLowerCase() === selectedMember.full_name.trim().toLowerCase())) &&
-      !String(p.notes || "").toLowerCase().includes("pending dues recovery") &&
-      !String(p.notes || "").toLowerCase().includes("loss settlement")
+      (p.member_name && selectedMember.full_name && p.member_name.trim().toLowerCase() === selectedMember.full_name.trim().toLowerCase())
     );
     if (memPayments.length > 0) {
       memPayments.sort((a, b) => {
@@ -321,11 +307,11 @@ export default function MembersDirectoryPage() {
       });
       const latestP = memPayments[0];
       let updatedNotes = latestP.notes || "";
-      if (newStartDate) {
+      if (editData.sub_start_date) {
         if (updatedNotes.includes("Start Date:")) {
-          updatedNotes = updatedNotes.replace(/Start Date:\s*\d{4}-\d{2}-\d{2}/i, `Start Date: ${newStartDate}`);
+          updatedNotes = updatedNotes.replace(/Start Date:\s*\d{4}-\d{2}-\d{2}/i, `Start Date: ${editData.sub_start_date}`);
         } else {
-          updatedNotes += ` — Start Date: ${newStartDate}`;
+          updatedNotes += ` — Start Date: ${editData.sub_start_date}`;
         }
       }
       if (finalSubEnd && !String(finalSubEnd).startsWith("1970")) {
@@ -335,13 +321,12 @@ export default function MembersDirectoryPage() {
           updatedNotes += `, Expiry: ${finalSubEnd}`;
         }
       }
-      const paymentDateVal = newStartDate ? (newStartDate.includes('T') ? newStartDate : `${newStartDate}T12:00:00.000Z`) : latestP.paid_at;
-      await updatePaymentRecord(latestP.id, {
-        member_name: editData.full_name || latestP.member_name,
-        notes: updatedNotes,
-        paid_at: paymentDateVal,
-        skipMemberSync: true
-      });
+      try {
+        await supabase.from('payments').update({
+          member_name: editData.full_name || latestP.member_name,
+          notes: updatedNotes
+        }).eq('id', latestP.id);
+      } catch (err) {}
     }
 
     setEditProfileModalOpen(false);
