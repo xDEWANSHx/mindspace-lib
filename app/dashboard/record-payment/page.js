@@ -31,6 +31,7 @@ import {
   recordPayment,
   deletePayment,
   updateMember,
+  updatePaymentRecord,
   formatDate,
   addOneMonth,
   subtractOneMonth,
@@ -487,8 +488,8 @@ function RecordPaymentContent() {
       setManagedStudent(target);
       const joinStr = target.joining_date || formatDate(new Date());
       const dates = getMemberSubscriptionDates(target, payments);
-      const subStartVal = dates.subStart !== "--" ? dates.subStart : "";
-      const subExpiryVal = (target.subscription_end_date && !String(target.subscription_end_date).startsWith("1970")) ? target.subscription_end_date : (dates.subExpiry !== "--" ? dates.subExpiry : "");
+      const subStartVal = dates.subStart !== "--" ? dates.subStart : joinStr;
+      const subExpiryVal = (target.subscription_end_date && !String(target.subscription_end_date).startsWith("1970")) ? target.subscription_end_date : (dates.subExpiry !== "--" ? dates.subExpiry : (subStartVal ? addOneMonth(subStartVal) : ""));
 
       setEditFormData({
         full_name: target.full_name || "",
@@ -518,15 +519,15 @@ function RecordPaymentContent() {
     }
 
     const updatedDues = parseFloat(editFormData.outstanding_dues || 0);
-    const joinStr = editFormData.joining_date || managedStudent.joining_date || formatDate(new Date());
-    const finalSubEnd = editFormData.subscription_end_date || (editFormData.sub_start_date ? addOneMonth(editFormData.sub_start_date) : null);
+    const newStartDate = editFormData.sub_start_date || editFormData.joining_date || managedStudent.joining_date || formatDate(new Date());
+    const finalSubEnd = editFormData.subscription_end_date || (newStartDate ? addOneMonth(newStartDate) : managedStudent.subscription_end_date);
 
     await updateMember(managedStudent.id, {
       full_name: editFormData.full_name,
       mobile: editFormData.mobile,
       shift: editFormData.shift,
       seat_no: editFormData.seat_no ? editFormData.seat_no : null,
-      joining_date: joinStr,
+      joining_date: newStartDate,
       subscription_end_date: finalSubEnd,
       plan_amount: finalPlanAmount,
       outstanding_dues: updatedDues,
@@ -534,11 +535,14 @@ function RecordPaymentContent() {
     });
 
     const memPayments = payments.filter(p =>
-      p.member_id === managedStudent.id ||
+      (p.member_id === managedStudent.id ||
       p.member_id === managedStudent.permanent_id ||
       p.member_id === managedStudent.student_no ||
-      (p.member_name && managedStudent.full_name && p.member_name.trim().toLowerCase() === managedStudent.full_name.trim().toLowerCase())
+      (p.member_name && managedStudent.full_name && p.member_name.trim().toLowerCase() === managedStudent.full_name.trim().toLowerCase())) &&
+      !String(p.notes || "").toLowerCase().includes("pending dues recovery") &&
+      !String(p.notes || "").toLowerCase().includes("loss settlement")
     );
+
     if (memPayments.length > 0) {
       memPayments.sort((a, b) => {
         const tA = a.paid_at ? new Date(a.paid_at).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
@@ -547,11 +551,11 @@ function RecordPaymentContent() {
       });
       const latestP = memPayments[0];
       let updatedNotes = latestP.notes || "";
-      if (editFormData.sub_start_date) {
+      if (newStartDate) {
         if (updatedNotes.includes("Start Date:")) {
-          updatedNotes = updatedNotes.replace(/Start Date:\s*\d{4}-\d{2}-\d{2}/i, `Start Date: ${editFormData.sub_start_date}`);
+          updatedNotes = updatedNotes.replace(/Start Date:\s*\d{4}-\d{2}-\d{2}/i, `Start Date: ${newStartDate}`);
         } else {
-          updatedNotes += ` — Start Date: ${editFormData.sub_start_date}`;
+          updatedNotes += ` — Start Date: ${newStartDate}`;
         }
       }
       if (finalSubEnd && !String(finalSubEnd).startsWith("1970")) {
@@ -561,12 +565,13 @@ function RecordPaymentContent() {
           updatedNotes += `, Expiry: ${finalSubEnd}`;
         }
       }
-      try {
-        await supabase.from('payments').update({
-          member_name: editFormData.full_name || latestP.member_name,
-          notes: updatedNotes
-        }).eq('id', latestP.id);
-      } catch (err) {}
+      const paymentDateVal = newStartDate ? (newStartDate.includes('T') ? newStartDate : `${newStartDate}T12:00:00.000Z`) : latestP.paid_at;
+      await updatePaymentRecord(latestP.id, {
+        member_name: editFormData.full_name || latestP.member_name,
+        notes: updatedNotes,
+        paid_at: paymentDateVal,
+        skipMemberSync: true
+      });
     }
 
     setManageStudentModalOpen(false);
