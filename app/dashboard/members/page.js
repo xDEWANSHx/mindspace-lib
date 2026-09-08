@@ -43,6 +43,7 @@ import {
   formatDate,
   addOneMonth,
   subtractOneMonth,
+  addDaysToDate,
   getMemberSubscriptionDates
 } from "@/lib/adminService";
 import { exportListToPDF } from "@/lib/pdfExport";
@@ -68,6 +69,21 @@ export default function MembersDirectoryPage() {
   // Payment History Modal State
   const [paymentHistoryModalOpen, setPaymentHistoryModalOpen] = useState(false);
   const [historyMember, setHistoryMember] = useState(null);
+
+  // Edit Payment / Invoice Modal State
+  const [editPaymentModalOpen, setEditPaymentModalOpen] = useState(false);
+  const [editingPaymentData, setEditingPaymentData] = useState({
+    id: "",
+    invoice_id: "",
+    member_id: "",
+    member_name: "",
+    amount: 0,
+    payment_mode: "Cash",
+    paid_at: "",
+    sub_start_date: "",
+    subscription_end_date: "",
+    notes: ""
+  });
 
   // Edit Profile Modal State with ALL fields editable!
   const [editProfileModalOpen, setEditProfileModalOpen] = useState(false);
@@ -99,6 +115,8 @@ export default function MembersDirectoryPage() {
   const [renewDays, setRenewDays] = useState(30);
   const [renewAmount, setRenewAmount] = useState(1100);
   const [renewMode, setRenewMode] = useState("UPI");
+  const [renewStartDate, setRenewStartDate] = useState("");
+  const [renewEndDate, setRenewEndDate] = useState("");
 
   const [markLeftModalOpen, setMarkLeftModalOpen] = useState(false);
   const [leftReason, setLeftReason] = useState("");
@@ -408,6 +426,21 @@ export default function MembersDirectoryPage() {
     await reloadData();
   };
 
+  const handleOpenRenewModal = (m) => {
+    setSelectedMember(m);
+    const todayStr = formatDate(new Date());
+    const startStr = (m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970"))
+      ? String(m.subscription_end_date).substring(0, 10)
+      : todayStr;
+    const endStr = addDaysToDate(startStr, 30);
+    setRenewStartDate(startStr);
+    setRenewEndDate(endStr);
+    setRenewDays(30);
+    setRenewAmount(m.plan_amount || 1100);
+    setRenewMode("UPI");
+    setRenewModalOpen(true);
+  };
+
   const handlePerformRenewal = async (e) => {
     e.preventDefault();
     if (!selectedMember) return;
@@ -415,17 +448,108 @@ export default function MembersDirectoryPage() {
     await recordPayment({
       member_id: selectedMember.id,
       member_name: selectedMember.full_name,
-      amount: renewAmount,
+      amount: parseFloat(renewAmount || 0),
       branch: activeBranch,
       payment_mode: renewMode,
-      notes: `Subscription Renewal (${renewDays} days)`,
+      start_date: renewStartDate,
+      end_date: renewEndDate,
+      notes: `Full Subscription Renewal (${renewDays} days)`,
       is_renewal: true,
-      extend_days: renewDays
+      extend_days: parseInt(renewDays || 30)
     });
 
     setRenewModalOpen(false);
     await reloadData();
     alert(`Successfully renewed subscription for ${selectedMember.full_name}!`);
+  };
+
+  const handleOpenEditPaymentModal = (p, m) => {
+    let subStart = "";
+    let subEnd = "";
+    if (p.notes) {
+      const matchStart = p.notes.match(/Start Date:\s*(\d{4}-\d{2}-\d{2})/i);
+      if (matchStart && matchStart[1]) subStart = matchStart[1];
+      const matchEnd = p.notes.match(/Expiry:\s*(\d{4}-\d{2}-\d{2})/i);
+      if (matchEnd && matchEnd[1]) subEnd = matchEnd[1];
+    }
+    if (!subStart && p.paid_at) {
+      subStart = String(p.paid_at).substring(0, 10);
+    }
+    if (!subEnd && subStart) {
+      subEnd = addOneMonth(subStart);
+    }
+
+    setEditingPaymentData({
+      id: p.id,
+      invoice_id: p.invoice_id || p.id,
+      member_id: p.member_id,
+      member_name: p.member_name || m?.full_name || "",
+      amount: p.amount || 0,
+      payment_mode: p.payment_mode || "Cash",
+      paid_at: p.paid_at ? String(p.paid_at).substring(0, 10) : formatDate(new Date()),
+      sub_start_date: subStart,
+      subscription_end_date: subEnd,
+      notes: p.notes || ""
+    });
+    setEditPaymentModalOpen(true);
+  };
+
+  const handleSavePaymentEdit = async (e) => {
+    e.preventDefault();
+    if (!editingPaymentData.id) return;
+
+    let updatedNotes = editingPaymentData.notes || "";
+    if (editingPaymentData.sub_start_date) {
+      if (updatedNotes.includes("Start Date:")) {
+        updatedNotes = updatedNotes.replace(/Start Date:\s*\d{4}-\d{2}-\d{2}/i, `Start Date: ${editingPaymentData.sub_start_date}`);
+      } else {
+        updatedNotes += ` — Start Date: ${editingPaymentData.sub_start_date}`;
+      }
+    }
+    if (editingPaymentData.subscription_end_date) {
+      if (updatedNotes.includes("Expiry:")) {
+        updatedNotes = updatedNotes.replace(/Expiry:\s*\d{4}-\d{2}-\d{2}/i, `Expiry: ${editingPaymentData.subscription_end_date}`);
+      } else {
+        updatedNotes += `, Expiry: ${editingPaymentData.subscription_end_date}`;
+      }
+    }
+
+    const txDate = editingPaymentData.paid_at
+      ? `${editingPaymentData.paid_at}T12:00:00.000Z`
+      : new Date().toISOString();
+
+    const amt = parseFloat(editingPaymentData.amount || 0);
+    const updates = {
+      amount: amt,
+      payment_mode: editingPaymentData.payment_mode,
+      paid_at: txDate,
+      notes: updatedNotes
+    };
+
+    if (editingPaymentData.payment_mode === "Cash") {
+      updates.cash_amount = amt;
+      updates.online_amount = 0;
+    } else if (editingPaymentData.payment_mode === "Online" || editingPaymentData.payment_mode === "UPI") {
+      updates.cash_amount = 0;
+      updates.online_amount = amt;
+    }
+
+    try {
+      await supabase.from('payments').update(updates).eq('id', editingPaymentData.id);
+
+      // Also sync member's subscription_end_date if edited
+      if (selectedMember && editingPaymentData.subscription_end_date) {
+        await updateMember(selectedMember.id, {
+          subscription_end_date: editingPaymentData.subscription_end_date
+        }, 'Admin', selectedMember);
+      }
+
+      setEditPaymentModalOpen(false);
+      await reloadData();
+      alert(`Invoice ${editingPaymentData.invoice_id} updated successfully!`);
+    } catch (err) {
+      alert("Failed to update payment: " + err.message);
+    }
   };
 
   const handlePerformMarkLeft = async (e) => {
@@ -762,7 +886,7 @@ export default function MembersDirectoryPage() {
                 </button>
 
                 <button
-                  onClick={() => { setRenewModalOpen(true); setRenewAmount(selectedMember.plan_amount || 1100); }}
+                  onClick={() => handleOpenRenewModal(selectedMember)}
                   className="p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-extrabold flex flex-col items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
                 >
                   <RotateCcw className="w-4 h-4" />
@@ -871,6 +995,13 @@ export default function MembersDirectoryPage() {
                             <p className="font-mono font-black text-emerald-600">₹{p.amount}</p>
                             <span className="text-[9px] text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-full font-bold border border-cyan-200">{p.payment_mode}</span>
                           </div>
+                          <button
+                            onClick={() => handleOpenEditPaymentModal(p, selectedMember)}
+                            className="p-2 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors cursor-pointer"
+                            title="Edit Invoice & Subscription Dates"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
                           <button
                             onClick={() => handleSyncSinglePayment(p, selectedMember)}
                             className="p-2 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors cursor-pointer"
@@ -1155,18 +1286,69 @@ export default function MembersDirectoryPage() {
         {renewModalOpen && selectedMember && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-fadeIn">
             <form onSubmit={handlePerformRenewal} className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 w-full max-w-md space-y-4 shadow-2xl animate-popIn">
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">Renew Subscription: {selectedMember.full_name}</h3>
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">Renew Subscription</h3>
+                <button type="button" onClick={() => setRenewModalOpen(false)} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-mono text-emerald-800 font-extrabold uppercase block">{selectedMember.permanent_id}</span>
+                  <span className="text-xs font-black text-emerald-950">{selectedMember.full_name}</span>
+                </div>
+                <span className="text-xs font-bold text-emerald-700 font-mono">{selectedMember.shift}</span>
+              </div>
+
               <div className="space-y-3 text-xs">
                 <div>
-                  <label className="text-slate-500 font-bold mb-1 block">Duration (Days)</label>
+                  <label className="text-indigo-800 font-extrabold mb-1 block">Renewal Start Date *</label>
                   <input
-                    type="number"
-                    value={renewDays}
-                    onChange={(e) => setRenewDays(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none font-mono"
+                    type="date"
+                    value={renewStartDate}
+                    onChange={(e) => {
+                      const newStart = e.target.value;
+                      setRenewStartDate(newStart);
+                      if (newStart && renewDays) {
+                        setRenewEndDate(addDaysToDate(newStart, parseInt(renewDays || 30)));
+                      }
+                    }}
+                    className="w-full bg-indigo-50/70 border border-indigo-200 rounded-2xl p-3 text-indigo-950 font-mono font-bold outline-none focus:border-indigo-500"
                     required
                   />
                 </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-500 font-bold mb-1 block">Duration (Days)</label>
+                    <input
+                      type="number"
+                      value={renewDays}
+                      onChange={(e) => {
+                        const days = e.target.value;
+                        setRenewDays(days);
+                        if (renewStartDate && days) {
+                          setRenewEndDate(addDaysToDate(renewStartDate, parseInt(days || 30)));
+                        }
+                      }}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none font-mono font-bold"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-emerald-800 font-extrabold mb-1 block">Valid Till (Expiry) *</label>
+                    <input
+                      type="date"
+                      value={renewEndDate}
+                      onChange={(e) => setRenewEndDate(e.target.value)}
+                      className="w-full bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3 text-emerald-950 font-mono font-bold outline-none focus:border-emerald-500"
+                      required
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="text-slate-500 font-bold mb-1 block">Amount Collected (₹)</label>
                   <input
@@ -1177,6 +1359,7 @@ export default function MembersDirectoryPage() {
                     required
                   />
                 </div>
+
                 <div>
                   <label className="text-slate-500 font-bold mb-1 block">Payment Mode</label>
                   <select
@@ -1191,9 +1374,102 @@ export default function MembersDirectoryPage() {
                   </select>
                 </div>
               </div>
+
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setRenewModalOpen(false)} className="flex-1 p-3 rounded-2xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100">Cancel</button>
-                <button type="submit" className="flex-1 p-3 rounded-2xl bg-cyan-500 hover:bg-cyan-600 text-xs font-bold text-white shadow-lg shadow-cyan-500/25">Confirm Renewal</button>
+                <button type="submit" className="flex-1 p-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white shadow-lg shadow-emerald-500/25">Confirm & Save Renewal</button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Modal: Edit Payment / Invoice Transaction */}
+        {editPaymentModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-fadeIn">
+            <form onSubmit={handleSavePaymentEdit} className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 w-full max-w-md space-y-4 shadow-2xl animate-popIn">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">Edit Invoice & Subscription Dates</h3>
+                  <p className="text-[11px] text-cyan-700 font-mono font-bold">{editingPaymentData.invoice_id} • {editingPaymentData.member_name}</p>
+                </div>
+                <button type="button" onClick={() => setEditPaymentModalOpen(false)} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="text-indigo-800 font-extrabold mb-1 block">Subscription Start Date</label>
+                  <input
+                    type="date"
+                    value={editingPaymentData.sub_start_date}
+                    onChange={(e) => setEditingPaymentData({ ...editingPaymentData, sub_start_date: e.target.value })}
+                    className="w-full bg-indigo-50/70 border border-indigo-200 rounded-2xl p-3 text-indigo-950 font-mono font-bold outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-emerald-800 font-extrabold mb-1 block">Subscription Expiry Date</label>
+                  <input
+                    type="date"
+                    value={editingPaymentData.subscription_end_date}
+                    onChange={(e) => setEditingPaymentData({ ...editingPaymentData, subscription_end_date: e.target.value })}
+                    className="w-full bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3 text-emerald-950 font-mono font-bold outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-500 font-bold mb-1 block">Amount (₹)</label>
+                    <input
+                      type="number"
+                      value={editingPaymentData.amount}
+                      onChange={(e) => setEditingPaymentData({ ...editingPaymentData, amount: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none font-mono font-bold"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-slate-500 font-bold mb-1 block">Payment Mode</label>
+                    <select
+                      value={editingPaymentData.payment_mode}
+                      onChange={(e) => setEditingPaymentData({ ...editingPaymentData, payment_mode: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none font-bold"
+                    >
+                      <option value="UPI">UPI / GPay</option>
+                      <option value="Cash">Cash</option>
+                      <option value="Online">Online Bank Transfer</option>
+                      <option value="Card">Card</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-slate-500 font-bold mb-1 block">Payment Transaction Date</label>
+                  <input
+                    type="date"
+                    value={editingPaymentData.paid_at}
+                    onChange={(e) => setEditingPaymentData({ ...editingPaymentData, paid_at: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-500 font-bold mb-1 block">Description / Plan Notes</label>
+                  <input
+                    type="text"
+                    value={editingPaymentData.notes}
+                    onChange={(e) => setEditingPaymentData({ ...editingPaymentData, notes: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none"
+                    placeholder="e.g. Monthly Fee Payment"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setEditPaymentModalOpen(false)} className="flex-1 p-3 rounded-2xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100">Cancel</button>
+                <button type="submit" className="flex-1 p-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-xs font-bold text-white shadow-lg shadow-indigo-500/25">Save Invoice Changes</button>
               </div>
             </form>
           </div>
