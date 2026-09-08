@@ -18,6 +18,7 @@ function InvoicePrintContent() {
 
   const [payment, setPayment] = useState(null);
   const [member, setMember] = useState(null);
+  const [memberPayments, setMemberPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [copyToast, setCopyToast] = useState("");
   const [isCopied, setIsCopied] = useState(false);
@@ -94,6 +95,15 @@ function InvoicePrintContent() {
         }
 
         setMember(foundMem || null);
+
+        const memPayments = (pList || []).filter(p =>
+          (foundPayment.member_id && p.member_id === foundPayment.member_id) ||
+          (foundMem?.id && p.member_id === foundMem.id) ||
+          (foundMem?.permanent_id && (p.member_id === foundMem.permanent_id || p.member_id === foundMem.student_no)) ||
+          (p.member_name && foundMem?.full_name && p.member_name.trim().toLowerCase() === foundMem.full_name.trim().toLowerCase()) ||
+          (p.member_name && foundPayment.member_name && p.member_name.trim().toLowerCase() === foundPayment.member_name.trim().toLowerCase())
+        );
+        setMemberPayments(memPayments);
       }
       setLoading(false);
     }
@@ -158,7 +168,7 @@ function InvoicePrintContent() {
     }
   }
   if (!rawSubStart) {
-    const rawSubStartStr = payment?.start_date || payment?.paid_at || payment?.created_at || member?.joining_date;
+    const rawSubStartStr = payment?.start_date || member?.joining_date || payment?.paid_at || payment?.created_at;
     rawSubStart = rawSubStartStr ? String(rawSubStartStr).substring(0, 10) : "";
   }
   const subscriptionStartDate = rawSubStart ? rawSubStart.split('-').reverse().join('/') : joiningDate;
@@ -179,21 +189,67 @@ function InvoicePrintContent() {
   const endDate = rawEndDate ? rawEndDate.split('-').reverse().join('/') : "N/A";
   const startDate = subscriptionStartDate;
 
+  // Actual cash/online collected in THIS transaction receipt
   const paidAmount = parseFloat(payment.amount || 0);
 
-  // Parse total plan billing amount for this specific transaction
-  let planAmount = paidAmount;
+  // Determine full Base Plan amount for the student's subscription cycle
+  let planAmount = 0;
   if (payment?.notes) {
     const matchOf = payment.notes.match(/Paid\s*₹?\s*(\d+)\s*of\s*₹?\s*(\d+)/i);
     if (matchOf && matchOf[2]) {
       planAmount = parseFloat(matchOf[2]);
     }
+    const matchBase = payment.notes.match(/Base\s*Plan:\s*₹?\s*(\d+)/i);
+    if (!planAmount && matchBase && matchBase[1]) {
+      planAmount = parseFloat(matchBase[1]);
+    }
   }
-  if (paidAmount === 0 && (member?.outstanding_dues || payment?.outstanding_dues)) {
-    planAmount = parseFloat(member?.outstanding_dues || payment?.outstanding_dues || member?.plan_amount || 0);
-  } else if (planAmount === 0 && paidAmount > 0) {
-    planAmount = paidAmount;
+
+  if (!planAmount && member?.plan_amount && parseFloat(member.plan_amount) > 0) {
+    planAmount = parseFloat(member.plan_amount);
   }
+
+  if (!planAmount) {
+    const isHalfDay = shiftName === "Morning" || shiftName === "Evening";
+    planAmount = isHalfDay ? 600 : 1100;
+  }
+
+  // Parse remaining dues for THIS receipt snapshot:
+  let remainingDuesAtReceipt = null;
+  if (payment?.notes) {
+    const matchDues = payment.notes.match(/₹?\s*(\d+)\s*(?:Remaining\s*Dues|Dues\s*Pending|Dues\s*Remaining|Dues\s*Left|Overdue\s*Dues)/i);
+    if (matchDues && matchDues[1] !== undefined) {
+      remainingDuesAtReceipt = parseFloat(matchDues[1]);
+    }
+  }
+
+  // If notes do not contain explicit snapshot dues, compute chronologically from memberPayments:
+  if (remainingDuesAtReceipt === null) {
+    const sortedMemPayments = [...memberPayments].sort((a, b) => {
+      const tA = new Date(a.paid_at || a.created_at || 0).getTime();
+      const tB = new Date(b.paid_at || b.created_at || 0).getTime();
+      if (tA !== tB) return tA - tB;
+      const numA = parseInt(String(a.invoice_id || '').replace(/\D/g, ''), 10) || 0;
+      const numB = parseInt(String(b.invoice_id || '').replace(/\D/g, ''), 10) || 0;
+      return numA - numB;
+    });
+
+    const thisIdx = sortedMemPayments.findIndex(p => p.id === payment.id || p.invoice_id === payment.invoice_id);
+    if (thisIdx !== -1) {
+      const paymentsUpToThis = sortedMemPayments.slice(0, thisIdx + 1);
+      const sumPaidUpToThis = paymentsUpToThis.reduce((acc, p) => acc + parseFloat(p.amount || 0), 0);
+      remainingDuesAtReceipt = Math.max(0, planAmount - sumPaidUpToThis);
+    } else {
+      remainingDuesAtReceipt = Math.max(0, planAmount - paidAmount);
+    }
+  }
+
+  // Calculate previously paid in this cycle
+  const previouslyPaidInCycle = Math.max(0, planAmount - paidAmount - remainingDuesAtReceipt);
+
+  const isReceiptFullySettled = (remainingDuesAtReceipt === 0);
+  const isPayLater = paidAmount === 0 && remainingDuesAtReceipt > 0;
+  const isPartial = paidAmount > 0 && remainingDuesAtReceipt > 0;
 
   // Dynamic Duration Text (e.g., "15 Days", "3 Days", "1 Month", etc.)
   let durationText = "1 Month";
@@ -254,11 +310,6 @@ function InvoicePrintContent() {
     }
   }
 
-  const outstandingDues = parseFloat(member?.outstanding_dues !== undefined ? member.outstanding_dues : (payment?.outstanding_dues || 0));
-  const isFullySettled = outstandingDues === 0;
-  // PAY_LATER: subscription activated but ₹0 collected
-  const isPayLater = paidAmount === 0 && outstandingDues > 0;
-
   // Locker Details for Invoice: prioritize Student Directory (member.has_locker)
   const hasLocker = member
     ? !!member.has_locker
@@ -266,8 +317,8 @@ function InvoicePrintContent() {
         ? !!payment.has_locker
         : !!(payment?.notes && payment.notes.toLowerCase().includes("locker")));
   const lockerNo = member?.locker_no || payment?.locker_no || "Standard Locker";
-  const lockerFee = hasLocker ? (planAmount > 50 ? 50 : 0) : 0;
-  const seatPlanAmount = hasLocker ? Math.max(0, planAmount - lockerFee) : planAmount;
+  const lockerFee = hasLocker ? 50 : 0;
+  const seatPlanAmount = Math.max(0, planAmount - lockerFee);
 
   // Promised Payment Due Date (if present)
   const rawPromisedDate = member?.due_date || member?.dues_due_date || payment?.dues_due_date;
@@ -275,7 +326,7 @@ function InvoicePrintContent() {
 
   // Check if overdue
   let isPromisedOverdue = false;
-  if (outstandingDues > 0 && rawPromisedDate) {
+  if (remainingDuesAtReceipt > 0 && rawPromisedDate) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const pParts = rawPromisedDate.split('-').map(Number);
@@ -303,19 +354,21 @@ function InvoicePrintContent() {
       `Student Name: ${studentName}\n` +
       `Allotment ID: ${studentAllotmentNo}\n` +
       `Seat Allocated: ${seatNo} (${shiftName})\n` +
+      `Total Subscription Plan: ₹${planAmount}\n` +
+      (previouslyPaidInCycle > 0 ? `Previously Paid in Cycle: ₹${previouslyPaidInCycle}\n` : ``) +
       (isPayLater
-        ? `Payment Status: PAY LATER (₹${outstandingDues} dues pending)\n`
-        : `Amount Paid: ₹${paidAmount} (${payment.payment_mode || "Cash"})\n`) +
+        ? `Payment Status: PAY LATER (₹${remainingDuesAtReceipt} dues pending)\n`
+        : `Amount Paid Today: ₹${paidAmount} (${payment.payment_mode || "Cash"})\n`) +
       `Subscription Validity: ${startDate} to ${endDate}\n`;
 
-    if (!isFullySettled) {
-      message += `Outstanding Dues: ₹${outstandingDues}\n`;
+    if (!isReceiptFullySettled) {
+      message += `Outstanding Dues Remaining: ₹${remainingDuesAtReceipt}\n`;
       if (promisedDateFormatted) {
         message += `Promised Dues Payment Date: ${promisedDateFormatted} ${isPromisedOverdue ? '(OVERDUE)' : ''}\n`;
       }
       message += `Status: PARTIAL / DUES PENDING\n`;
     } else {
-      message += `Status: FULLY SETTLED\n`;
+      message += `Status: FULLY SETTLED (All Dues Cleared)\n`;
     }
 
     message += `\n📄 *View / Download Online Fee Receipt:* \n${directUrl}\n\n` +
@@ -514,10 +567,20 @@ function InvoicePrintContent() {
                   {receiptDate}
                 </span>
               </div>
-              {isPayLater && (
+              {isPayLater ? (
                 <div className="flex justify-between gap-4 pt-1 border-t border-amber-200 mt-1">
                   <span className="text-amber-600 font-extrabold text-[10px] uppercase">STATUS</span>
                   <span className="font-black text-[10px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">PAY LATER</span>
+                </div>
+              ) : isReceiptFullySettled ? (
+                <div className="flex justify-between gap-4 pt-1 border-t border-emerald-200 mt-1">
+                  <span className="text-emerald-600 font-extrabold text-[10px] uppercase">STATUS</span>
+                  <span className="font-black text-[10px] text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">FULLY SETTLED</span>
+                </div>
+              ) : (
+                <div className="flex justify-between gap-4 pt-1 border-t border-amber-200 mt-1">
+                  <span className="text-amber-600 font-extrabold text-[10px] uppercase">STATUS</span>
+                  <span className="font-black text-[10px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">PARTIAL PAYMENT</span>
                 </div>
               )}
             </div>
@@ -544,7 +607,7 @@ function InvoicePrintContent() {
             <div className="space-y-1 font-medium text-slate-700">
               <p>Shift: <span className="font-bold text-slate-900">{shiftName}</span></p>
               <p>Seat No: <span className="font-bold text-indigo-700 font-mono text-sm">{seatNo}</span></p>
-              <p>Locker Facility: <span className={`font-bold font-mono ${member?.has_locker ? "text-emerald-700 font-extrabold" : "text-slate-500"}`}>{member?.has_locker ? `Assigned (${member?.locker_no || 'Standard Locker'})` : 'No Locker Assigned'}</span></p>
+              <p>Locker Facility: <span className={`font-bold font-mono ${hasLocker ? "text-purple-700 font-extrabold" : "text-slate-500"}`}>{hasLocker ? `Assigned (${lockerNo})` : 'No Locker Assigned'}</span></p>
               <p>Initial Admission Date: <span className="font-bold text-slate-900 font-mono">{joiningDate}</span></p>
               <p>Subscription Start Date: <span className="font-bold text-indigo-700 font-mono">{subscriptionStartDate}</span></p>
               <p>Valid Till: <span className="font-bold text-slate-900 font-mono">{endDate}</span></p>
@@ -566,27 +629,27 @@ function InvoicePrintContent() {
             <tbody className="divide-y divide-slate-200 text-slate-800">
               <tr className="bg-white">
                 <td className="py-4 px-5">
-                  <p className="font-bold text-slate-900 text-sm">Library Membership Desk Subscription</p>
+                  <p className="font-bold text-slate-900 text-sm">Library Membership Desk Subscription ({shiftName})</p>
                   <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                    High speed Wi-Fi, AC quiet study sanctuary access, reserved cabin desk workstation.
+                    High speed Wi-Fi, AC quiet study sanctuary access, reserved cabin desk workstation ({shiftName} shift).
                   </p>
                 </td>
                 <td className="py-4 px-5 text-center font-semibold font-mono text-slate-700">{termText}</td>
                 <td className="py-4 px-5 text-right font-bold font-mono text-slate-900 text-sm">₹{seatPlanAmount.toLocaleString()}.00</td>
               </tr>
               {hasLocker && (
-                <tr className="bg-slate-50/50">
+                <tr className="bg-purple-50/40">
                   <td className="py-3.5 px-5">
-                    <p className="font-bold text-emerald-800 text-xs flex items-center gap-1.5">
+                    <p className="font-bold text-purple-900 text-xs flex items-center gap-1.5">
                       <span>Personal Locker Storage Access</span>
-                      <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-mono text-[10px]">{lockerNo}</span>
+                      <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 font-mono text-[10px]">{lockerNo}</span>
                     </p>
                     <p className="text-[10px] text-slate-500 font-medium">
                       Dedicated secure personal storage locker facility allotment.
                     </p>
                   </td>
                   <td className="py-3.5 px-5 text-center font-semibold font-mono text-slate-700">{termText}</td>
-                  <td className="py-3.5 px-5 text-right font-bold font-mono text-emerald-700 text-xs">₹{lockerFee.toLocaleString()}.00</td>
+                  <td className="py-3.5 px-5 text-right font-bold font-mono text-purple-700 text-xs">₹{lockerFee.toLocaleString()}.00</td>
                 </tr>
               )}
             </tbody>
@@ -601,17 +664,21 @@ function InvoicePrintContent() {
           <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 text-xs space-y-1.5">
             <div className="flex items-center justify-between font-bold text-slate-900">
               <span>Payment Mode: <strong className="text-indigo-700 font-mono">{payment.payment_mode || "Cash"}</strong></span>
-              <span className="font-mono text-sm font-black text-slate-900">₹{paidAmount.toLocaleString()}.00</span>
+              <span className="font-mono text-sm font-black text-emerald-700">₹{paidAmount.toLocaleString()}.00 Collected</span>
             </div>
             {payment.payment_mode === "Split" && (
               <p className="text-[11px] text-slate-600 font-mono font-semibold">
                 Split Breakdown: Cash ₹{payment.cash_amount || 0} + Online ₹{payment.online_amount || 0}
               </p>
             )}
-            <p className="text-[11px] text-slate-500 font-medium">
+            <p className="text-[11px] text-slate-600 font-medium">
               {isPayLater
-                ? <>Subscription activated on <strong className="font-mono text-slate-700">{receiptDate}</strong> under <strong className="text-amber-700">Pay Later</strong> scheme — Start Date: {subscriptionStartDate}, Expiry: {endDate}. Full dues of ₹{outstandingDues} to be cleared by promised date.</>
-                : <>Recorded on <strong className="font-mono text-slate-700">{receiptDate}</strong> — Start Date: {subscriptionStartDate}, Expiry: {endDate}. Base Plan: ₹{planAmount}. Amount Paid: ₹{paidAmount}.</>
+                ? <>Subscription activated on <strong className="font-mono text-slate-800">{receiptDate}</strong> under <strong className="text-amber-700">Pay Later</strong> scheme — Start Date: {subscriptionStartDate}, Expiry: {endDate}. Total Base Plan: ₹{planAmount}. Full dues of ₹{remainingDuesAtReceipt} to be cleared by promised date.</>
+                : isReceiptFullySettled && previouslyPaidInCycle > 0
+                ? <>Final Settlement Payment recorded on <strong className="font-mono text-slate-800">{receiptDate}</strong> — Subscription Validity: {subscriptionStartDate} to {endDate}. Base Plan: ₹{planAmount}. Previously Paid: ₹{previouslyPaidInCycle}. Amount Paid Today: ₹{paidAmount} (Dues Fully Cleared).</>
+                : isPartial
+                ? <>Partial Deposit recorded on <strong className="font-mono text-slate-800">{receiptDate}</strong> — Subscription Validity: {subscriptionStartDate} to {endDate}. Base Plan: ₹{planAmount}. Amount Paid Today: ₹{paidAmount}. Remaining Balance Dues: ₹{remainingDuesAtReceipt}.</>
+                : <>Full Subscription Payment recorded on <strong className="font-mono text-slate-800">{receiptDate}</strong> — Subscription Validity: {subscriptionStartDate} to {endDate}. Base Plan: ₹{planAmount}. Amount Paid: ₹{paidAmount} (Fully Paid).</>
               }
             </p>
             {payment.notes && (
@@ -627,28 +694,28 @@ function InvoicePrintContent() {
           {/* Left Settlement & Promised Date Card */}
           <div className="space-y-3">
             <div className={`p-5 rounded-2xl border flex items-center gap-4 ${
-              isFullySettled
+              isReceiptFullySettled
                 ? "bg-emerald-50/80 border-emerald-200 text-emerald-900"
                 : "bg-amber-50/80 border-amber-200 text-amber-900"
             }`}>
-              <div className={`p-2.5 rounded-xl shrink-0 ${isFullySettled ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"}`}>
+              <div className={`p-2.5 rounded-xl shrink-0 ${isReceiptFullySettled ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"}`}>
                 <ShieldCheck className="w-6 h-6" />
               </div>
               <div>
                 <p className="font-black text-sm tracking-wide uppercase">
-                  {isFullySettled ? "FULLY SETTLED" : "PARTIAL / DUES PENDING"}
+                  {isReceiptFullySettled ? "FULLY SETTLED" : "PARTIAL / DUES PENDING"}
                 </p>
                 <p className="text-[11px] font-medium opacity-90 mt-0.5">
-                  {isFullySettled
-                    ? "All dues for this subscription have been fully cleared."
-                    : `Outstanding Dues Remaining: ₹${outstandingDues}`
+                  {isReceiptFullySettled
+                    ? "All dues for this subscription cycle have been fully cleared."
+                    : `Outstanding Balance Dues Remaining: ₹${remainingDuesAtReceipt}`
                   }
                 </p>
               </div>
             </div>
 
             {/* PROMISED DUE DATE CARD (If dues exist) */}
-            {!isFullySettled && (
+            {!isReceiptFullySettled && (
               <div className={`p-4 rounded-2xl border space-y-1.5 ${
                 isPromisedOverdue
                   ? "bg-rose-50 border-rose-300 text-rose-950"
@@ -681,35 +748,48 @@ function InvoicePrintContent() {
           {/* Right Grand Total Calculation */}
           <div className="space-y-2 text-xs font-medium text-slate-700">
             <div className="flex justify-between py-1 border-b border-slate-100">
-              <span>Subtotal (Seat Subscription Plan)</span>
+              <span>Base Plan Rate ({shiftName})</span>
               <span className="font-mono font-bold text-slate-900">₹{seatPlanAmount.toLocaleString()}.00</span>
             </div>
             {hasLocker && (
-              <div className="flex justify-between py-1 border-b border-slate-100 text-emerald-700 font-bold">
+              <div className="flex justify-between py-1 border-b border-slate-100 text-purple-700 font-bold">
                 <span>Locker Storage Facility Fee</span>
                 <span className="font-mono">+₹{lockerFee.toLocaleString()}.00</span>
               </div>
             )}
-            <div className="flex justify-between py-1 border-b border-slate-100">
-              <span>Discount / Adjustment</span>
-              <span className="font-mono font-bold text-emerald-600">-₹{invoiceDiscount.toLocaleString()}.00</span>
-            </div>
-            <div className="flex justify-between py-1 border-b border-slate-100">
-              <span>Total Billing Amount</span>
-              <span className="font-mono font-bold text-slate-900">₹{planAmount.toLocaleString()}.00</span>
-            </div>
-            <div className="flex justify-between py-1 border-b border-slate-100">
-              <span>Amount Paid Today</span>
-              <span className="font-mono font-bold text-emerald-600">₹{paidAmount.toLocaleString()}.00</span>
-            </div>
-            {!isFullySettled && (
-              <div className="flex justify-between py-1 border-b border-slate-100 text-amber-700">
-                <span className="font-bold">Remaining Dues</span>
-                <span className="font-mono font-bold">₹{outstandingDues.toLocaleString()}.00</span>
+            {invoiceDiscount > 0 && (
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span>Discount / Adjustment</span>
+                <span className="font-mono font-bold text-emerald-600">-₹{invoiceDiscount.toLocaleString()}.00</span>
               </div>
             )}
-            <div className="flex justify-between py-2 text-base font-black text-[#0F172A] border-t-2 border-slate-900">
-              <span className="uppercase tracking-wider">GRAND TOTAL</span>
+            <div className="flex justify-between py-1 border-b border-slate-100 bg-slate-50/80 px-2 rounded-lg font-bold">
+              <span>Total Subscription Plan Fee</span>
+              <span className="font-mono text-slate-900">₹{planAmount.toLocaleString()}.00</span>
+            </div>
+            {previouslyPaidInCycle > 0 && (
+              <div className="flex justify-between py-1 border-b border-slate-100 text-slate-600 px-2">
+                <span>Previously Paid in this Cycle</span>
+                <span className="font-mono font-bold text-slate-700">₹{previouslyPaidInCycle.toLocaleString()}.00</span>
+              </div>
+            )}
+            <div className="flex justify-between py-1 border-b border-slate-100 text-emerald-700 font-bold bg-emerald-50/70 px-2 rounded-lg">
+              <span>Amount Paid in this Receipt</span>
+              <span className="font-mono">₹{paidAmount.toLocaleString()}.00</span>
+            </div>
+            {remainingDuesAtReceipt > 0 ? (
+              <div className="flex justify-between py-1 border-b border-slate-100 text-rose-700 font-bold bg-rose-50/70 px-2 rounded-lg">
+                <span>Remaining Dues</span>
+                <span className="font-mono">₹{remainingDuesAtReceipt.toLocaleString()}.00</span>
+              </div>
+            ) : (
+              <div className="flex justify-between py-1 border-b border-slate-100 text-emerald-700 font-bold px-2">
+                <span>Remaining Dues</span>
+                <span className="font-mono">₹0.00 (Fully Settled)</span>
+              </div>
+            )}
+            <div className="flex justify-between py-2 text-base font-black text-[#0F172A] border-t-2 border-slate-900 px-2">
+              <span className="uppercase tracking-wider">GRAND TOTAL (PLAN VALUE)</span>
               <span className="font-mono">₹{planAmount.toLocaleString()}.00</span>
             </div>
           </div>
@@ -740,3 +820,4 @@ export default function InvoicePrintPage() {
     </Suspense>
   );
 }
+

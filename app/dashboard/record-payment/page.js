@@ -244,6 +244,14 @@ function RecordPaymentContent() {
     return m.joining_date || paidDate || formatDate(new Date());
   };
 
+  const getCurrentCycleSubDates = (m) => {
+    if (!m) return { start: paidDate || formatDate(new Date()), end: addOneMonth(paidDate || formatDate(new Date())) };
+    const dates = getMemberSubscriptionDates(m, payments);
+    const subStart = dates.subStart !== "--" ? dates.subStart : (m.joining_date || paidDate || formatDate(new Date()));
+    const subEnd = (m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970")) ? m.subscription_end_date : (dates.subExpiry !== "--" ? dates.subExpiry : addOneMonth(subStart));
+    return { start: subStart, end: subEnd };
+  };
+
   // Auto-sync locker/date state when student selected (Runs ONLY when selectedMemberId changes!)
   useEffect(() => {
     if (selectedMemberObj) {
@@ -253,20 +261,30 @@ function RecordPaymentContent() {
       if (selectedMemberObj.outstanding_dues > 0) {
         setPaymentType("COLLECT_DUES");
         setAmountPaidToday(selectedMemberObj.outstanding_dues);
-        setJoiningDate(getDefaultSubStartDate(selectedMemberObj));
+        const cycle = getCurrentCycleSubDates(selectedMemberObj);
+        setJoiningDate(cycle.start);
+        setOverrideExpiryDate(cycle.end);
       } else {
         setPaymentType("FULL");
         setPlanFee(selectedMemberObj.plan_amount || 1100);
         setAmountPaidToday(selectedMemberObj.plan_amount || 1100);
         setJoiningDate(getDefaultSubStartDate(selectedMemberObj));
+        setOverrideExpiryDate("");
       }
     }
   }, [selectedMemberId]);
 
   // Adjust joining date when switching paymentType
   useEffect(() => {
-    if (selectedMemberObj && paymentType !== "COLLECT_DUES") {
-      setJoiningDate(getDefaultSubStartDate(selectedMemberObj));
+    if (selectedMemberObj) {
+      if (paymentType === "COLLECT_DUES") {
+        const cycle = getCurrentCycleSubDates(selectedMemberObj);
+        setJoiningDate(cycle.start);
+        setOverrideExpiryDate(cycle.end);
+      } else {
+        setJoiningDate(getDefaultSubStartDate(selectedMemberObj));
+        setOverrideExpiryDate("");
+      }
     }
   }, [paymentType]);
 
@@ -356,7 +374,6 @@ function RecordPaymentContent() {
     const parsedPaidToday = parseFloat(amountPaidToday) || 0;
     const parsedPlanFee = parseFloat(planFee) || 0;
 
-
     const cPart = paymentMode === "Cash" ? parsedPaidToday : (paymentMode === "Split" ? (parseFloat(cashAmount) || 0) : 0);
     const oPart = (paymentMode === "Online" || paymentMode === "UPI") ? parsedPaidToday : (paymentMode === "Split" ? (parseFloat(onlineAmount) || 0) : 0);
 
@@ -390,11 +407,11 @@ function RecordPaymentContent() {
 
     const planDurationLabel = durationTab === "15D" ? "15 Days" : `${extendDays} days`;
     if (paymentType === "FULL") {
-      defaultNote = `Full Subscription Renewal (${planDurationLabel})`;
+      defaultNote = `Full Subscription Renewal (${planDurationLabel}, Paid ₹${parsedPaidToday} of ₹${effectivePayable}, ₹0 Remaining Dues)`;
       if (parsedDiscount > 0) defaultNote += ` [Discount Given: ₹${parsedDiscount}]`;
       isRenewalAction = true;
     } else if (paymentType === "PARTIAL") {
-      defaultNote = `Partial Payment (${planDurationLabel}, Paid ₹${parsedPaidToday} of ₹${effectivePayable}, ₹${calculatedNewDues} Dues Pending)`;
+      defaultNote = `Partial Payment (${planDurationLabel}, Paid ₹${parsedPaidToday} of ₹${effectivePayable}, ₹${calculatedNewDues} Remaining Dues)`;
       if (parsedDiscount > 0) defaultNote += ` [Discount Given: ₹${parsedDiscount}]`;
       isRenewalAction = true;
     } else if (paymentType === "PAY_LATER") {
@@ -402,7 +419,8 @@ function RecordPaymentContent() {
       if (parsedDiscount > 0) defaultNote += ` [Discount Given: ₹${parsedDiscount}]`;
       isRenewalAction = true;
     } else if (paymentType === "COLLECT_DUES") {
-      defaultNote = `Pending Dues Recovery (Paid ₹${parsedPaidToday}, ₹${calculatedNewDues} Remaining Dues)`;
+      const fullCyclePlan = selectedMemberObj.plan_amount || 1100;
+      defaultNote = `Pending Dues Recovery (Paid ₹${parsedPaidToday} of ₹${fullCyclePlan}, ₹${calculatedNewDues} Remaining Dues)`;
       isRenewalAction = false;
     }
 
