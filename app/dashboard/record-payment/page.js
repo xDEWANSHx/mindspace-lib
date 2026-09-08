@@ -187,7 +187,7 @@ function RecordPaymentContent() {
     } else if (paymentType === "PARTIAL") {
       setAmountPaidToday(Math.round(netPay / 2));
     } else if (paymentType === "COLLECT_DUES") {
-      setAmountPaidToday(netPay);
+      setAmountPaidToday(selectedMemberObj?.outstanding_dues || 0);
       setDiscountAmount(0);
     }
   }, [paymentType, planFee, discountAmount, effectivePayable, durationTab, selectedMemberObj?.outstanding_dues]);
@@ -225,8 +225,14 @@ function RecordPaymentContent() {
         });
         const topMem = sortedList[0];
         setSelectedMemberId(topMem.id);
-        setPlanFee(topMem.plan_amount || 1100);
-        setAmountPaidToday(topMem.plan_amount || 1100);
+        if (topMem.outstanding_dues > 0) {
+          setPaymentType("COLLECT_DUES");
+          setAmountPaidToday(topMem.outstanding_dues);
+        } else {
+          setPaymentType("FULL");
+          setPlanFee(topMem.plan_amount || 1100);
+          setAmountPaidToday(topMem.plan_amount || 1100);
+        }
       }
     }
     load();
@@ -237,8 +243,9 @@ function RecordPaymentContent() {
 
   const getDefaultSubStartDate = (m) => {
     if (!m) return paidDate || formatDate(new Date());
+    const todayStr = formatDate(new Date());
     const hasValidSub = m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970");
-    if (hasValidSub) {
+    if (hasValidSub && m.subscription_end_date >= todayStr) {
       return addDaysToDate(m.subscription_end_date, 1);
     }
     return m.joining_date || paidDate || formatDate(new Date());
@@ -253,7 +260,7 @@ function RecordPaymentContent() {
       if (selectedMemberObj.outstanding_dues > 0) {
         setPaymentType("COLLECT_DUES");
         setAmountPaidToday(selectedMemberObj.outstanding_dues);
-        setJoiningDate(getDefaultSubStartDate(selectedMemberObj));
+        setJoiningDate(selectedMemberObj.joining_date || formatDate(new Date()));
       } else {
         setPaymentType("FULL");
         setPlanFee(selectedMemberObj.plan_amount || 1100);
@@ -265,8 +272,12 @@ function RecordPaymentContent() {
 
   // Adjust joining date when switching paymentType
   useEffect(() => {
-    if (selectedMemberObj && paymentType !== "COLLECT_DUES") {
-      setJoiningDate(getDefaultSubStartDate(selectedMemberObj));
+    if (selectedMemberObj) {
+      if (paymentType === "COLLECT_DUES") {
+        setJoiningDate(selectedMemberObj.joining_date || formatDate(new Date()));
+      } else {
+        setJoiningDate(getDefaultSubStartDate(selectedMemberObj));
+      }
     }
   }, [paymentType]);
 
@@ -284,7 +295,6 @@ function RecordPaymentContent() {
 
   // Auto-calculated Dues
   const currDues = selectedMemberObj?.outstanding_dues || 0;
-  const targetDues = effectivePayable;
   let calculatedNewDues = 0;
   if (paymentType === "FULL") {
     calculatedNewDues = 0;
@@ -293,7 +303,7 @@ function RecordPaymentContent() {
   } else if (paymentType === "PAY_LATER") {
     calculatedNewDues = Math.round(effectivePayable);
   } else if (paymentType === "COLLECT_DUES") {
-    calculatedNewDues = Math.max(0, Math.round(targetDues - parseFloat(amountPaidToday || 0)));
+    calculatedNewDues = Math.max(0, Math.round(currDues - parseFloat(amountPaidToday || 0)));
   }
 
   // Pending Dues Warning & Block Check
@@ -1091,76 +1101,75 @@ function RecordPaymentContent() {
                   </div>
                 </div>
 
-                {durationTab === "CUSTOM" && (
-                  <div className="bg-gradient-to-r from-amber-50 to-orange-50/70 p-4 rounded-2xl border-2 border-amber-300 space-y-3 animate-fadeIn shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <label className="text-amber-950 font-black text-xs flex items-center gap-1.5">
-                        <Edit3 className="w-4 h-4 text-amber-600" />
-                        <span>CUSTOM DURATION & PRICING (FLEXIBLE DAYS)</span>
-                      </label>
-                      <span className="text-[10px] text-amber-900 font-bold bg-amber-200/80 px-2.5 py-0.5 rounded-md border border-amber-300">
-                        Enter any days (1, 2, 3...) & custom rate
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[11px] font-bold text-amber-950 block mb-1">
-                          Number of Days: <span className="text-slate-500 font-normal font-mono">({joiningDate} + {extendDays || 0}d = {finalExpiryDate})</span>
+                  {durationTab === "CUSTOM" && (
+                    <div className="bg-gradient-to-r from-amber-50 to-orange-50/70 p-4 rounded-2xl border-2 border-amber-300 space-y-3 animate-fadeIn shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <label className="text-amber-950 font-black text-xs flex items-center gap-1.5">
+                          <Edit3 className="w-4 h-4 text-amber-600" />
+                          <span>CUSTOM DURATION & PRICING (FLEXIBLE DAYS)</span>
                         </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            min="1"
-                            value={extendDays}
-                            onChange={(e) => {
-                              const days = Math.max(1, parseInt(e.target.value) || 1);
-                              setExtendDays(days);
-                            }}
-                            className="w-full bg-white border border-amber-300 rounded-xl p-2.5 text-xs font-black text-slate-900 font-mono outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-200 shadow-inner"
-                            placeholder="e.g. 1, 2, 7, 10, 45..."
-                          />
-                          <div className="flex gap-1 shrink-0">
-                            {[1, 2, 3, 7, 10, 15].map(d => (
-                              <button
-                                key={d}
-                                type="button"
-                                onClick={() => setExtendDays(d)}
-                                className={`px-2 py-1.5 rounded-lg text-[10px] font-bold border cursor-pointer ${
-                                  extendDays === d
-                                    ? "bg-amber-600 text-white border-amber-600 shadow-sm"
-                                    : "bg-white text-amber-900 border-amber-200 hover:bg-amber-100"
-                                }`}
-                              >
-                                {d}d
-                              </button>
-                            ))}
+                        <span className="text-[10px] text-amber-900 font-bold bg-amber-200/80 px-2.5 py-0.5 rounded-md border border-amber-300">
+                          Enter any days (1, 2, 3...) & custom rate
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[11px] font-bold text-amber-950 block mb-1">
+                            Number of Days: <span className="text-slate-500 font-normal font-mono">({joiningDate} + {extendDays || 0}d = {finalExpiryDate})</span>
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min="1"
+                              value={extendDays}
+                              onChange={(e) => {
+                                const days = Math.max(1, parseInt(e.target.value) || 1);
+                                setExtendDays(days);
+                              }}
+                              className="w-full bg-white border border-amber-300 rounded-xl p-2.5 text-xs font-black text-slate-900 font-mono outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-200 shadow-inner"
+                              placeholder="e.g. 1, 2, 7, 10, 45..."
+                            />
+                            <div className="flex gap-1 shrink-0">
+                              {[1, 2, 3, 7, 10, 15].map(d => (
+                                <button
+                                  key={d}
+                                  type="button"
+                                  onClick={() => setExtendDays(d)}
+                                  className={`px-2 py-1.5 rounded-lg text-[10px] font-bold border cursor-pointer ${
+                                    extendDays === d
+                                      ? "bg-amber-600 text-white border-amber-600 shadow-sm"
+                                      : "bg-white text-amber-900 border-amber-200 hover:bg-amber-100"
+                                  }`}
+                                >
+                                  {d}d
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] font-bold text-amber-950 block mb-1">
+                            Custom Plan Fee / Net Payable (₹):
+                          </label>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-emerald-700 font-black text-sm">₹</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={planFee}
+                              onChange={(e) => setPlanFee(parseFloat(e.target.value || 0))}
+                              className="w-full bg-white border-2 border-emerald-500 rounded-xl p-2.5 text-xs font-black text-emerald-950 font-mono outline-none focus:border-emerald-700 shadow-inner"
+                              placeholder="Custom price (e.g. 200, 400, 750...)"
+                            />
                           </div>
                         </div>
                       </div>
-
-                      <div>
-                        <label className="text-[11px] font-bold text-amber-950 block mb-1">
-                          Custom Plan Fee / Net Payable (₹):
-                        </label>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-emerald-700 font-black text-sm">₹</span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={planFee}
-                            onChange={(e) => setPlanFee(parseFloat(e.target.value || 0))}
-                            className="w-full bg-white border-2 border-emerald-500 rounded-xl p-2.5 text-xs font-black text-emerald-950 font-mono outline-none focus:border-emerald-700 shadow-inner"
-                            placeholder="Custom price (e.g. 200, 400, 750...)"
-                          />
-                        </div>
-                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* DISCOUNT SECTION (Current Month Discount) */}
-                {paymentType !== "COLLECT_DUES" && (
+                  {/* DISCOUNT SECTION (Current Month Discount) */}
                   <div className="bg-cyan-50/70 p-4 rounded-2xl border border-cyan-200/90 space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-slate-800 font-extrabold text-xs flex items-center gap-1.5">
@@ -1203,75 +1212,74 @@ function RecordPaymentContent() {
                       </div>
                     </div>
                   </div>
-                )}
 
-                {/* LOCKER FACILITY MANAGEMENT (ADD / REMOVE) */}
-                <div className="bg-purple-50/70 p-4 rounded-2xl border border-purple-200/90 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Lock className="w-4 h-4 text-purple-600 shrink-0" />
-                      <div>
-                        <span className="font-extrabold text-slate-900 text-xs block">Locker Facility Status</span>
-                        <span className="text-[10px] text-slate-500 font-medium">
-                          {includeLocker
-                            ? `Locker Active (${selectedMemberObj?.locker_no || "Assigned"})`
-                            : "No Locker assigned for next period"}
-                        </span>
+                  {/* LOCKER FACILITY MANAGEMENT (ADD / REMOVE) */}
+                  <div className="bg-purple-50/70 p-4 rounded-2xl border border-purple-200/90 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Lock className="w-4 h-4 text-purple-600 shrink-0" />
+                        <div>
+                          <span className="font-extrabold text-slate-900 text-xs block">Locker Facility Status</span>
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            {includeLocker
+                              ? `Locker Active (${selectedMemberObj?.locker_no || "Assigned"})`
+                              : "No Locker assigned for next period"}
+                          </span>
+                        </div>
                       </div>
+                      
+                      <button
+                        type="button"
+                        onClick={() => setIncludeLocker(prev => !prev)}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          includeLocker
+                            ? "bg-purple-600 text-white shadow-md hover:bg-purple-700"
+                            : "bg-white border border-purple-300 text-purple-800 hover:bg-purple-50"
+                        }`}
+                      >
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>
+                          {includeLocker
+                            ? `Locker Active (Click to Remove -₹${lockerFee})`
+                            : `+ Add Locker (+₹${lockerFee})`}
+                        </span>
+                      </button>
                     </div>
-                    
-                    <button
-                      type="button"
-                      onClick={() => setIncludeLocker(prev => !prev)}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        includeLocker
-                          ? "bg-purple-600 text-white shadow-md hover:bg-purple-700"
-                          : "bg-white border border-purple-300 text-purple-800 hover:bg-purple-50"
-                      }`}
-                    >
-                      <Lock className="w-3.5 h-3.5" />
-                      <span>
-                        {includeLocker
-                          ? `Locker Active (Click to Remove -₹${lockerFee})`
-                          : `+ Add Locker (+₹${lockerFee})`}
-                      </span>
-                    </button>
-                  </div>
 
-                  <div className="flex items-center justify-between text-[10px] font-bold pt-1 border-t border-purple-200/60">
-                    <span className={includeLocker ? "text-purple-900 font-black" : "text-slate-500 font-bold"}>
-                      {includeLocker ? "🔒 Locker Included for this Subscription" : "🔓 No Locker facility (Discontinued)"}
-                    </span>
-                    {selectedMemberObj?.has_locker !== includeLocker && (
-                      <span className={`px-2 py-0.5 rounded-md border text-[9px] font-black ${
-                        includeLocker
-                          ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                          : "bg-amber-100 text-amber-900 border-amber-300"
-                      }`}>
-                        {includeLocker ? "+ Locker will be added on saving" : "❌ Locker will be removed on saving"}
+                    <div className="flex items-center justify-between text-[10px] font-bold pt-1 border-t border-purple-200/60">
+                      <span className={includeLocker ? "text-purple-900 font-black" : "text-slate-500 font-bold"}>
+                        {includeLocker ? "🔒 Locker Included for this Subscription" : "🔓 No Locker facility (Discontinued)"}
                       </span>
+                      {selectedMemberObj?.has_locker !== includeLocker && (
+                        <span className={`px-2 py-0.5 rounded-md border text-[9px] font-black ${
+                          includeLocker
+                            ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                            : "bg-amber-100 text-amber-900 border-amber-300"
+                        }`}>
+                          {includeLocker ? "+ Locker will be added on saving" : "❌ Locker will be removed on saving"}
+                        </span>
+                      )}
+                    </div>
+
+                    {includeLocker && (
+                      <div className="flex items-center justify-between pt-1 border-t border-purple-200/60 animate-fadeIn">
+                        <label className="text-[11px] font-bold text-purple-900">Locker Fee Amount (₹):</label>
+                        <input
+                          type="number"
+                          value={lockerFee}
+                          onChange={(e) => {
+                            const newFee = parseFloat(e.target.value || 0);
+                            const oldFee = parseFloat(lockerFee || 0);
+                            const diff = newFee - oldFee;
+                            setLockerFee(newFee);
+                            setPlanFee(prev => Math.max(0, prev + diff));
+                          }}
+                          className="w-24 bg-white border border-purple-300 rounded-xl p-1.5 text-xs font-mono font-bold text-purple-900 outline-none focus:border-purple-600"
+                        />
+                      </div>
                     )}
                   </div>
-
-                  {includeLocker && (
-                    <div className="flex items-center justify-between pt-1 border-t border-purple-200/60 animate-fadeIn">
-                      <label className="text-[11px] font-bold text-purple-900">Locker Fee Amount (₹):</label>
-                      <input
-                        type="number"
-                        value={lockerFee}
-                        onChange={(e) => {
-                          const newFee = parseFloat(e.target.value || 0);
-                          const oldFee = parseFloat(lockerFee || 0);
-                          const diff = newFee - oldFee;
-                          setLockerFee(newFee);
-                          setPlanFee(prev => Math.max(0, prev + diff));
-                        }}
-                        className="w-24 bg-white border border-purple-300 rounded-xl p-1.5 text-xs font-mono font-bold text-purple-900 outline-none focus:border-purple-600"
-                      />
-                    </div>
-                  )}
                 </div>
-              </div>
 
               {/* AMOUNT COLLECTED TODAY VS DUES BREAKDOWN */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
