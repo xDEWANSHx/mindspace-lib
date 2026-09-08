@@ -1384,8 +1384,8 @@ function RecordPaymentContent() {
 
               {/* DATE PAID & NOTES */}
               {/* Date Paid is only shown when actual money is being collected (amount > 0) */}
-              <div className={`grid grid-cols-1 gap-4 ${parseFloat(amountPaidToday) > 0 && !isDuesBlocked ? "sm:grid-cols-2" : ""}`}>
-                {parseFloat(amountPaidToday) > 0 && !isDuesBlocked && (
+              <div className={`grid grid-cols-1 gap-4 ${parseFloat(amountPaidToday) > 0 ? "sm:grid-cols-2" : ""}`}>
+                {parseFloat(amountPaidToday) > 0 && (
                   <div>
                     <label className="text-slate-500 font-bold mb-1 block flex items-center justify-between">
                       <span>DATE PAID (COLLECTION DATE)</span>
@@ -1406,40 +1406,25 @@ function RecordPaymentContent() {
                     type="text"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    disabled={isDuesBlocked}
                     placeholder="Optional transaction remarks..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none font-medium disabled:opacity-50"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none font-medium"
                   />
                 </div>
               </div>
 
               {/* SUBMIT BUTTON */}
-              {isDuesBlocked ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPaymentType("COLLECT_DUES");
-                    setAmountPaidToday(currDues);
-                  }}
-                  className="w-full py-4 rounded-2xl font-extrabold text-xs uppercase tracking-wider shadow-xl transition-all flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 text-white cursor-pointer"
-                >
-                  <AlertTriangle className="w-4 h-4 text-white" />
-                  <span>Click Here to Switch & Collect ₹{currDues} Pending Dues Now</span>
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  className="w-full py-4 rounded-2xl font-extrabold text-xs uppercase tracking-wider shadow-xl transition-all flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white shadow-slate-900/20 cursor-pointer"
-                >
-                  <CreditCard className="w-4 h-4 text-cyan-400" />
-                  <span>
-                    {paymentType === "FULL" && "Record Full Payment & Activate Plan"}
-                    {paymentType === "PARTIAL" && `Record Partial Payment (₹${amountPaidToday}) & Set ₹${calculatedNewDues} Dues`}
-                    {paymentType === "PAY_LATER" && `Activate Plan with Pay Later (₹${calculatedNewDues} Overdue Dues)`}
-                    {paymentType === "COLLECT_DUES" && `Collect ₹${amountPaidToday} Dues (${calculatedNewDues} Remaining)`}
-                  </span>
-                </button>
-              )}
+              <button
+                type="submit"
+                className="w-full py-4 rounded-2xl font-extrabold text-xs uppercase tracking-wider shadow-xl transition-all flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white shadow-slate-900/20 cursor-pointer"
+              >
+                <CreditCard className="w-4 h-4 text-cyan-400" />
+                <span>
+                  {paymentType === "FULL" && "Record Full Payment & Activate Plan"}
+                  {paymentType === "PARTIAL" && `Record Partial Payment (₹${amountPaidToday}) & Set ₹${calculatedNewDues} Dues`}
+                  {paymentType === "PAY_LATER" && `Activate Plan with Pay Later (₹${calculatedNewDues} Overdue Dues)`}
+                  {paymentType === "COLLECT_DUES" && `Collect ₹${amountPaidToday} Dues (${calculatedNewDues} Remaining)`}
+                </span>
+              </button>
             </form>
           </div>
         </div>
