@@ -484,17 +484,26 @@ function RecordPaymentContent() {
       const subStartVal = dates.subStart !== "--" ? dates.subStart : joinStr;
       const subExpiryVal = (target.subscription_end_date && !String(target.subscription_end_date).startsWith("1970")) ? target.subscription_end_date : (dates.subExpiry !== "--" ? dates.subExpiry : (subStartVal ? addOneMonth(subStartVal) : ""));
 
+      let normalizedShift = "Full Day";
+      if (String(target.shift || "").toLowerCase().includes("morning")) {
+        normalizedShift = "Morning";
+      } else if (String(target.shift || "").toLowerCase().includes("evening")) {
+        normalizedShift = "Evening";
+      } else if (String(target.shift || "").toLowerCase().includes("full")) {
+        normalizedShift = "Full Day";
+      }
+
       setEditFormData({
         full_name: target.full_name || "",
         mobile: target.mobile || "",
-        shift: target.shift || "Full Day",
+        shift: normalizedShift,
         seat_no: target.seat_no || "",
         joining_date: joinStr,
         sub_start_date: subStartVal,
         subscription_end_date: subExpiryVal,
-        plan_amount: target.plan_amount || 1100,
-        outstanding_dues: target.outstanding_dues || 0,
-        payment_status: target.outstanding_dues > 0 ? (target.outstanding_dues < (target.plan_amount || 1100) ? "PARTIAL" : "UNPAID") : "PAID"
+        plan_amount: target.plan_amount !== undefined ? target.plan_amount : (normalizedShift === "Full Day" ? 1100 : 600),
+        outstanding_dues: target.outstanding_dues !== undefined ? target.outstanding_dues : 0,
+        payment_status: target.payment_status || (target.outstanding_dues > 0 ? (target.outstanding_dues < (target.plan_amount || 1100) ? "PARTIAL" : "UNPAID") : "PAID")
       });
       setManageStudentModalOpen(true);
     } else {
@@ -506,12 +515,8 @@ function RecordPaymentContent() {
     e.preventDefault();
     if (!managedStudent) return;
 
-    let finalPlanAmount = parseFloat(editFormData.plan_amount || 1100);
-    if (editFormData.shift === "Full Day" && (finalPlanAmount === 600 || !editFormData.plan_amount)) {
-      finalPlanAmount = 1100;
-    }
-
-    const updatedDues = parseFloat(editFormData.outstanding_dues || 0);
+    const finalPlanAmount = parseFloat(editFormData.plan_amount !== undefined && editFormData.plan_amount !== "" ? editFormData.plan_amount : (editFormData.shift === "Full Day" ? 1100 : 600));
+    const updatedDues = parseFloat(editFormData.outstanding_dues !== undefined && editFormData.outstanding_dues !== "" ? editFormData.outstanding_dues : 0);
     const newStartDate = editFormData.sub_start_date || editFormData.joining_date || managedStudent.joining_date || formatDate(new Date());
     const finalSubEnd = editFormData.subscription_end_date || (newStartDate ? addOneMonth(newStartDate) : managedStudent.subscription_end_date);
 
@@ -1755,12 +1760,7 @@ function RecordPaymentContent() {
                     value={editFormData.shift}
                     onChange={(e) => {
                       const newShift = e.target.value;
-                      const oldBasePrice = editFormData.shift === "Full Day" ? 1100 : (editFormData.shift === "Morning" || editFormData.shift === "Evening" ? 600 : editFormData.plan_amount);
-                      const newBasePrice = newShift === "Full Day" ? 1100 : (newShift === "Morning" || newShift === "Evening" ? 600 : editFormData.plan_amount);
-                      const diff = newBasePrice - oldBasePrice;
-                      const currentDues = parseFloat(editFormData.outstanding_dues || 0);
-                      const newDues = Math.max(0, currentDues + diff);
-                      setEditFormData({ ...editFormData, shift: newShift, plan_amount: newBasePrice, outstanding_dues: newDues });
+                      setEditFormData({ ...editFormData, shift: newShift });
                     }}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-900 font-bold"
                   >

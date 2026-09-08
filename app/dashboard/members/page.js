@@ -232,6 +232,15 @@ export default function MembersDirectoryPage() {
     const subStartVal = dates.subStart !== "--" ? dates.subStart : joinStr;
     const subExpiryVal = (m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970")) ? m.subscription_end_date : (dates.subExpiry !== "--" ? dates.subExpiry : (subStartVal ? addOneMonth(subStartVal) : ""));
 
+    let normalizedShift = "Full Day";
+    if (String(m.shift || "").toLowerCase().includes("morning")) {
+      normalizedShift = "Morning";
+    } else if (String(m.shift || "").toLowerCase().includes("evening")) {
+      normalizedShift = "Evening";
+    } else if (String(m.shift || "").toLowerCase().includes("full")) {
+      normalizedShift = "Full Day";
+    }
+
     setEditData({
       full_name: m.full_name || "",
       student_no: m.student_no || "",
@@ -242,13 +251,13 @@ export default function MembersDirectoryPage() {
       address: m.address || "",
       aadhar_no: m.aadhar_no || "",
       targeting_exam: m.targeting_exam || "",
-      shift: m.shift || "Full Day",
+      shift: normalizedShift,
       seat_no: m.seat_no || "",
       joining_date: joinStr,
       sub_start_date: subStartVal,
       subscription_end_date: subExpiryVal,
-      plan_amount: m.plan_amount !== undefined ? m.plan_amount : 1100,
-      outstanding_dues: m.outstanding_dues || 0,
+      plan_amount: m.plan_amount !== undefined ? m.plan_amount : (normalizedShift === "Full Day" ? 1100 : 600),
+      outstanding_dues: m.outstanding_dues !== undefined ? m.outstanding_dues : 0,
       pay_later: m.pay_later || false,
       due_date: m.due_date || "",
       has_locker: m.has_locker || false,
