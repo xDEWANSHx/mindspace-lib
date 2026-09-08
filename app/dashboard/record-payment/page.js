@@ -613,7 +613,7 @@ function RecordPaymentContent() {
     const dueDateStr = m.due_date || m.dues_due_date;
     let isDueDatePassed = false;
     let hasDueDate = false;
-    if (dueDateStr) {
+    if (m.outstanding_dues > 0 && dueDateStr) {
       const parts = String(dueDateStr).substring(0, 10).split('-').map(Number);
       if (parts.length === 3 && !isNaN(parts[0])) {
         hasDueDate = true;
