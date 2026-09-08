@@ -226,30 +226,33 @@ export default function MembersDirectoryPage() {
 
   // Action: Open Edit Modal with ALL FIELDS initialized
   const openEditModal = (m) => {
+    setSelectedMember(m);
     const dates = getMemberSubscriptionDates(m, payments);
-    const subStartVal = dates.subStart !== "--" ? dates.subStart : "";
-    const subExpiryVal = dates.subExpiry !== "--" ? dates.subExpiry : "";
+    const subStartVal = dates.subStart !== "--" ? dates.subStart : (m.joining_date ? String(m.joining_date).substring(0, 10) : "");
+    const subExpiryVal = (m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970"))
+      ? String(m.subscription_end_date).substring(0, 10)
+      : (dates.subExpiry !== "--" ? dates.subExpiry : "");
 
     setEditData({
       full_name: m.full_name || "",
-      student_no: m.student_no || "",
+      student_no: m.student_no || m.permanent_id || "",
       father_name: m.father_name || "",
       mobile: m.mobile || "",
-      dob: m.dob || "",
+      dob: m.dob ? String(m.dob).substring(0, 10) : "",
       gender: m.gender || "Male",
       address: m.address || "",
       aadhar_no: m.aadhar_no || "",
       targeting_exam: m.targeting_exam || "",
       shift: m.shift || "Full Day",
       seat_no: m.seat_no || "",
-      joining_date: m.joining_date || "",
+      joining_date: m.joining_date ? String(m.joining_date).substring(0, 10) : "",
       sub_start_date: subStartVal,
       subscription_end_date: subExpiryVal,
       plan_amount: m.plan_amount !== undefined ? m.plan_amount : 1100,
-      outstanding_dues: m.outstanding_dues || 0,
+      outstanding_dues: m.outstanding_dues !== undefined ? m.outstanding_dues : 0,
       pay_later: m.pay_later || false,
-      due_date: m.due_date || "",
-      has_locker: m.has_locker || false,
+      due_date: m.due_date ? String(m.due_date).substring(0, 10) : (m.dues_due_date ? String(m.dues_due_date).substring(0, 10) : ""),
+      has_locker: !!m.has_locker,
       locker_no: m.locker_no || "",
       is_active: m.is_active !== false
     });
@@ -261,28 +264,26 @@ export default function MembersDirectoryPage() {
     e.preventDefault();
     if (!selectedMember) return;
 
-    let finalPlanAmt = parseFloat(editData.plan_amount || 1100);
-    if (editData.shift === "Full Day" && (finalPlanAmt === 600 || !editData.plan_amount)) {
-      finalPlanAmt = 1100;
-    }
-    const finalSubEnd = editData.subscription_end_date || (editData.sub_start_date ? addOneMonth(editData.sub_start_date) : selectedMember.subscription_end_date);
+    const parsedPlanAmt = editData.plan_amount !== "" ? parseFloat(editData.plan_amount) : (selectedMember.plan_amount || 1100);
+    const parsedDues = editData.outstanding_dues !== "" ? parseFloat(editData.outstanding_dues) : (selectedMember.outstanding_dues || 0);
 
     const updates = {
       full_name: editData.full_name,
-      student_no: editData.student_no,
+      student_no: editData.student_no || selectedMember.student_no || selectedMember.permanent_id,
       father_name: editData.father_name,
       mobile: editData.mobile,
-      dob: editData.dob,
+      dob: editData.dob ? editData.dob : null,
       gender: editData.gender,
       address: editData.address,
       aadhar_no: editData.aadhar_no,
       targeting_exam: editData.targeting_exam,
       shift: editData.shift,
       seat_no: editData.seat_no ? editData.seat_no : null,
-      joining_date: editData.joining_date,
-      subscription_end_date: finalSubEnd,
-      plan_amount: finalPlanAmt,
-      outstanding_dues: parseFloat(editData.outstanding_dues || 0),
+      joining_date: editData.joining_date ? editData.joining_date : null,
+      subscription_end_date: editData.subscription_end_date ? editData.subscription_end_date : null,
+      plan_amount: parsedPlanAmt,
+      outstanding_dues: parsedDues,
+      payment_status: parsedDues === 0 ? "PAID" : (parsedDues < parsedPlanAmt ? "PARTIAL" : "UNPAID"),
       due_date: editData.due_date ? editData.due_date : null,
       dues_due_date: editData.due_date ? editData.due_date : null,
       has_locker: editData.has_locker,
@@ -292,47 +293,52 @@ export default function MembersDirectoryPage() {
 
     await updateMember(selectedMember.id, updates, 'Admin', selectedMember);
 
-    // Sync latest payment's member_name, start_date, end_date, and notes if edited
-    const memPayments = payments.filter(p =>
-      p.member_id === selectedMember.id ||
-      p.member_id === selectedMember.permanent_id ||
-      p.member_id === selectedMember.student_no ||
-      (p.member_name && selectedMember.full_name && p.member_name.trim().toLowerCase() === selectedMember.full_name.trim().toLowerCase())
-    );
-    if (memPayments.length > 0) {
-      memPayments.sort((a, b) => {
-        const tA = a.paid_at ? new Date(a.paid_at).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
-        const tB = b.paid_at ? new Date(b.paid_at).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
-        return tB - tA;
-      });
-      const latestP = memPayments[0];
-      let updatedNotes = latestP.notes || "";
-      if (editData.sub_start_date) {
-        if (updatedNotes.includes("Start Date:")) {
-          updatedNotes = updatedNotes.replace(/Start Date:\s*\d{4}-\d{2}-\d{2}/i, `Start Date: ${editData.sub_start_date}`);
-        } else {
-          updatedNotes += ` — Start Date: ${editData.sub_start_date}`;
-        }
-      }
-      if (finalSubEnd && !String(finalSubEnd).startsWith("1970")) {
-        if (updatedNotes.includes("Expiry:")) {
-          updatedNotes = updatedNotes.replace(/Expiry:\s*\d{4}-\d{2}-\d{2}/i, `Expiry: ${finalSubEnd}`);
-        } else {
-          updatedNotes += `, Expiry: ${finalSubEnd}`;
-        }
-      }
-      try {
+    // If full_name or subscription dates were edited, sync them to payment records
+    try {
+      if (editData.full_name && editData.full_name !== selectedMember.full_name) {
         await supabase.from('payments').update({
-          member_name: editData.full_name || latestP.member_name,
+          member_name: editData.full_name
+        }).or(`member_id.eq.${selectedMember.id},member_name.ilike.${selectedMember.full_name}`);
+      }
+
+      const memPayments = payments.filter(p =>
+        p.member_id === selectedMember.id ||
+        p.member_id === selectedMember.permanent_id ||
+        (p.member_name && selectedMember.full_name && p.member_name.trim().toLowerCase() === selectedMember.full_name.trim().toLowerCase())
+      );
+      if (memPayments.length > 0 && (editData.sub_start_date || editData.subscription_end_date)) {
+        memPayments.sort((a, b) => {
+          const tA = a.paid_at ? new Date(a.paid_at).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
+          const tB = b.paid_at ? new Date(b.paid_at).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
+          return tB - tA;
+        });
+        const latestP = memPayments[0];
+        let updatedNotes = latestP.notes || "";
+        if (editData.sub_start_date) {
+          if (updatedNotes.includes("Start Date:")) {
+            updatedNotes = updatedNotes.replace(/Start Date:\s*\d{4}-\d{2}-\d{2}/i, `Start Date: ${editData.sub_start_date}`);
+          } else {
+            updatedNotes += ` — Start Date: ${editData.sub_start_date}`;
+          }
+        }
+        if (editData.subscription_end_date && !String(editData.subscription_end_date).startsWith("1970")) {
+          if (updatedNotes.includes("Expiry:")) {
+            updatedNotes = updatedNotes.replace(/Expiry:\s*\d{4}-\d{2}-\d{2}/i, `Expiry: ${editData.subscription_end_date}`);
+          } else {
+            updatedNotes += `, Expiry: ${editData.subscription_end_date}`;
+          }
+        }
+        await supabase.from('payments').update({
           notes: updatedNotes
         }).eq('id', latestP.id);
-      } catch (err) {}
-    }
+      }
+    } catch (err) {}
 
     setEditProfileModalOpen(false);
     await reloadData();
     alert(`Updated student profile for ${editData.full_name}!`);
   };
+
 
   const handleSyncSinglePayment = async (p, m) => {
     const targetMember = m || members.find(mem => mem.id === p.member_id || mem.permanent_id === p.member_id || mem.student_no === p.member_id);
@@ -1000,17 +1006,7 @@ export default function MembersDirectoryPage() {
                   <label className="text-slate-500 font-bold mb-1 block">Shift Plan *</label>
                   <select
                     value={editData.shift}
-                    onChange={(e) => {
-                      const newShift = e.target.value;
-                      const oldBasePrice = editData.shift === "Full Day" ? 1100 : (editData.shift === "Morning" || editData.shift === "Evening" ? 600 : editData.plan_amount);
-                      const newBasePrice = newShift === "Full Day" ? 1100 : (newShift === "Morning" || newShift === "Evening" ? 600 : editData.plan_amount);
-                      const lockerAddOn = editData.has_locker ? 50 : 0;
-                      const autoPlanPrice = newBasePrice + lockerAddOn;
-                      const diff = newBasePrice - oldBasePrice;
-                      const currentDues = parseFloat(editData.outstanding_dues || 0);
-                      const newDues = Math.max(0, currentDues + diff);
-                      setEditData({ ...editData, shift: newShift, plan_amount: autoPlanPrice, outstanding_dues: newDues });
-                    }}
+                    onChange={(e) => setEditData({ ...editData, shift: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none font-bold"
                   >
                     <option value="Full Day">Full Day Access (06:00 AM - 10:00 PM)</option>
@@ -1040,21 +1036,7 @@ export default function MembersDirectoryPage() {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          const nextLocker = !editData.has_locker;
-                          const basePrice = editData.shift === "Full Day" ? 1100 : 600;
-                          const newPlanAmt = nextLocker ? (basePrice + 50) : basePrice;
-                          let newDues = parseFloat(editData.outstanding_dues || 0);
-                          if (newDues > newPlanAmt || newDues === parseFloat(editData.plan_amount || 0)) {
-                            newDues = newPlanAmt;
-                          }
-                          setEditData({
-                            ...editData,
-                            has_locker: nextLocker,
-                            plan_amount: newPlanAmt,
-                            outstanding_dues: newDues
-                          });
-                        }}
+                        onClick={() => setEditData({ ...editData, has_locker: !editData.has_locker })}
                         className={`px-4 py-1.5 rounded-full text-xs font-black transition-all ${
                           editData.has_locker ? "bg-purple-600 text-white shadow-md" : "bg-slate-200 text-slate-600"
                         }`}
@@ -1103,14 +1085,7 @@ export default function MembersDirectoryPage() {
                   <input
                     type="date"
                     value={editData.sub_start_date}
-                    onChange={(e) => {
-                      const newStart = e.target.value;
-                      setEditData({
-                        ...editData,
-                        sub_start_date: newStart,
-                        subscription_end_date: newStart ? addOneMonth(newStart) : editData.subscription_end_date
-                      });
-                    }}
+                    onChange={(e) => setEditData({ ...editData, sub_start_date: e.target.value })}
                     className="w-full bg-indigo-50/70 border border-indigo-200 rounded-2xl p-3 text-indigo-950 font-mono font-black outline-none focus:border-indigo-500"
                   />
                 </div>
@@ -1120,14 +1095,7 @@ export default function MembersDirectoryPage() {
                   <input
                     type="date"
                     value={editData.subscription_end_date}
-                    onChange={(e) => {
-                      const newEnd = e.target.value;
-                      setEditData({
-                        ...editData,
-                        subscription_end_date: newEnd,
-                        sub_start_date: newEnd ? subtractOneMonth(newEnd) : editData.sub_start_date
-                      });
-                    }}
+                    onChange={(e) => setEditData({ ...editData, subscription_end_date: e.target.value })}
                     className="w-full bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3 text-emerald-950 font-mono font-black outline-none focus:border-emerald-500"
                   />
                 </div>
@@ -1141,6 +1109,7 @@ export default function MembersDirectoryPage() {
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none font-mono"
                   />
                 </div>
+
 
                 <div>
                   <label className="text-slate-500 font-bold mb-1 block">Outstanding Dues (₹)</label>

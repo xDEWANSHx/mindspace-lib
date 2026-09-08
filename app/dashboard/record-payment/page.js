@@ -520,14 +520,10 @@ function RecordPaymentContent() {
     e.preventDefault();
     if (!managedStudent) return;
 
-    let finalPlanAmount = parseFloat(editFormData.plan_amount || 1100);
-    if (editFormData.shift === "Full Day" && (finalPlanAmount === 600 || !editFormData.plan_amount)) {
-      finalPlanAmount = 1100;
-    }
-
-    const updatedDues = parseFloat(editFormData.outstanding_dues || 0);
+    const finalPlanAmount = editFormData.plan_amount !== "" && editFormData.plan_amount !== undefined ? parseFloat(editFormData.plan_amount) : (managedStudent.plan_amount || 1100);
+    const updatedDues = editFormData.outstanding_dues !== "" && editFormData.outstanding_dues !== undefined ? parseFloat(editFormData.outstanding_dues) : (managedStudent.outstanding_dues || 0);
     const joinStr = editFormData.joining_date || managedStudent.joining_date || formatDate(new Date());
-    const finalSubEnd = editFormData.subscription_end_date || (editFormData.sub_start_date ? addOneMonth(editFormData.sub_start_date) : null);
+    const finalSubEnd = editFormData.subscription_end_date ? editFormData.subscription_end_date : null;
 
     await updateMember(managedStudent.id, {
       full_name: editFormData.full_name,
@@ -539,7 +535,7 @@ function RecordPaymentContent() {
       plan_amount: finalPlanAmount,
       outstanding_dues: updatedDues,
       payment_status: updatedDues === 0 ? "PAID" : (updatedDues < finalPlanAmount ? "PARTIAL" : "UNPAID")
-    });
+    }, 'Admin', managedStudent);
 
     const memPayments = payments.filter(p =>
       p.member_id === managedStudent.id ||
@@ -1785,15 +1781,7 @@ function RecordPaymentContent() {
                   <label className="text-slate-500 font-bold mb-1 block">Shift Plan</label>
                   <select
                     value={editFormData.shift}
-                    onChange={(e) => {
-                      const newShift = e.target.value;
-                      const oldBasePrice = editFormData.shift === "Full Day" ? 1100 : (editFormData.shift === "Morning" || editFormData.shift === "Evening" ? 600 : editFormData.plan_amount);
-                      const newBasePrice = newShift === "Full Day" ? 1100 : (newShift === "Morning" || newShift === "Evening" ? 600 : editFormData.plan_amount);
-                      const diff = newBasePrice - oldBasePrice;
-                      const currentDues = parseFloat(editFormData.outstanding_dues || 0);
-                      const newDues = Math.max(0, currentDues + diff);
-                      setEditFormData({ ...editFormData, shift: newShift, plan_amount: newBasePrice, outstanding_dues: newDues });
-                    }}
+                    onChange={(e) => setEditFormData({ ...editFormData, shift: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-900 font-bold"
                   >
                     <option value="Full Day">Full Day Access (06:00 AM - 10:00 PM)</option>
@@ -1818,11 +1806,7 @@ function RecordPaymentContent() {
                   <input
                     type="date"
                     value={editFormData.sub_start_date || ""}
-                    onChange={(e) => {
-                      const newStart = e.target.value;
-                      const newSubEnd = newStart ? addOneMonth(newStart) : editFormData.subscription_end_date;
-                      setEditFormData({ ...editFormData, sub_start_date: newStart, subscription_end_date: newSubEnd });
-                    }}
+                    onChange={(e) => setEditFormData({ ...editFormData, sub_start_date: e.target.value })}
                     className="w-full bg-indigo-50/70 border border-indigo-200 rounded-2xl p-3 text-indigo-950 font-mono font-bold outline-none focus:border-indigo-500"
                   />
                 </div>
@@ -1831,15 +1815,8 @@ function RecordPaymentContent() {
                   <label className="text-slate-500 font-bold mb-1 block">Subscription Expiry Date</label>
                   <input
                     type="date"
-                    value={editFormData.subscription_end_date}
-                    onChange={(e) => {
-                      const newEnd = e.target.value;
-                      setEditFormData({
-                        ...editFormData,
-                        subscription_end_date: newEnd,
-                        sub_start_date: newEnd ? subtractOneMonth(newEnd) : editFormData.sub_start_date
-                      });
-                    }}
+                    value={editFormData.subscription_end_date || ""}
+                    onChange={(e) => setEditFormData({ ...editFormData, subscription_end_date: e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-900 font-bold font-mono"
                   />
                 </div>
