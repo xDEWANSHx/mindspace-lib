@@ -307,10 +307,8 @@ function RecordPaymentContent() {
     calculatedNewDues = Math.max(0, Math.round(currDues - parseFloat(amountPaidToday || 0)));
   }
 
-  // Pending Dues Warning & Block Check
+  // Pending Dues Info
   const hasPendingDues = currDues > 0;
-  const isTryingNextMonthPayment = paymentType === "FULL" || paymentType === "PARTIAL" || paymentType === "PAY_LATER";
-  const isDuesBlocked = hasPendingDues && isTryingNextMonthPayment;
 
   const executePaymentRecord = async (payload) => {
     if (!selectedMemberObj) return;
@@ -358,11 +356,6 @@ function RecordPaymentContent() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedMemberObj) return;
-
-    if (isDuesBlocked) {
-      alert(`Student ${selectedMemberObj.full_name} has pending dues of ₹${currDues}. You cannot record a next month subscription payment until previous dues are cleared! Please use 'Collect Dues' scheme first.`);
-      return;
-    }
 
     const parsedPaidToday = parseFloat(amountPaidToday) || 0;
     const parsedPlanFee = parseFloat(planFee) || 0;
@@ -958,29 +951,22 @@ function RecordPaymentContent() {
                 </div>
               </div>
 
-              {/* PENDING DUES BLOCK WARNING BANNER */}
-              {isDuesBlocked && (
-                <div className="bg-rose-50 border-2 border-rose-300 rounded-3xl p-5 flex items-start gap-3.5 text-xs text-rose-900 shadow-sm animate-fadeIn">
-                  <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <h4 className="font-black text-rose-950 text-sm">
-                      Pending Dues Clear Required!
-                    </h4>
-                    <p className="text-rose-800 font-medium leading-relaxed">
-                      Student <strong className="text-rose-950">{selectedMemberObj?.full_name}</strong> has previous unpaid dues of <strong className="font-mono text-rose-950 font-black">₹{currDues}</strong>.
-                      You cannot record or activate next month&apos;s subscription payment until previous dues are cleared!
-                    </p>
-                    <div className="pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setPaymentType("COLLECT_DUES")}
-                        className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
-                      >
-                        <DollarSign className="w-4 h-4" />
-                        <span>Click Here to Collect ₹{currDues} Dues First</span>
-                      </button>
-                    </div>
+              {/* PENDING DUES INFO BANNER */}
+              {hasPendingDues && paymentType !== "COLLECT_DUES" && (
+                <div className="bg-amber-50 border border-amber-300 rounded-2xl p-3.5 flex items-center justify-between text-xs text-amber-900 shadow-sm animate-fadeIn">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      Student has previous unpaid dues of <strong className="font-mono font-black text-amber-950">₹{currDues}</strong>.
+                    </span>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentType("COLLECT_DUES")}
+                    className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] shadow-sm transition-all cursor-pointer shrink-0"
+                  >
+                    Collect ₹{currDues} Dues Instead
+                  </button>
                 </div>
               )}
 
@@ -1092,6 +1078,9 @@ function RecordPaymentContent() {
                           setOverrideExpiryDate("");
                           if (tab.id !== "CUSTOM") {
                             setExtendDays(tab.days);
+                          }
+                          if (paymentType === "COLLECT_DUES") {
+                            setPaymentType("FULL");
                           }
                         }}
                         className={`py-2.5 rounded-2xl font-black text-xs transition-all text-center cursor-pointer ${
@@ -1296,9 +1285,9 @@ function RecordPaymentContent() {
                     type="number"
                     value={amountPaidToday}
                     onChange={(e) => setAmountPaidToday(e.target.value)}
-                    disabled={paymentType === "PAY_LATER" || isDuesBlocked}
+                    disabled={paymentType === "PAY_LATER"}
                     className={`w-full border rounded-2xl p-3 outline-none font-extrabold font-mono text-sm ${
-                      paymentType === "PAY_LATER" || isDuesBlocked
+                      paymentType === "PAY_LATER"
                         ? "bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200"
                         : "bg-slate-50 text-slate-900 border-slate-200 focus:border-cyan-500"
                     }`}
@@ -1333,7 +1322,6 @@ function RecordPaymentContent() {
                     type="date"
                     value={promisedDueDate}
                     onChange={(e) => setPromisedDueDate(e.target.value)}
-                    disabled={isDuesBlocked}
                     className="w-full bg-white border border-amber-300 rounded-xl p-3 text-xs font-black text-amber-950 font-mono outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-200 shadow-inner"
                     required
                   />
@@ -1344,7 +1332,7 @@ function RecordPaymentContent() {
               )}
 
               {/* PAYMENT MODE SELECTOR (Only if collecting money today) */}
-              {parseFloat(amountPaidToday) > 0 && !isDuesBlocked && (
+              {parseFloat(amountPaidToday) > 0 && (
                 <div className="space-y-3">
                   <label className="text-slate-500 font-bold block">PAYMENT MODE FOR TODAY'S DEPOSIT</label>
                   <div className="grid grid-cols-3 gap-3">
