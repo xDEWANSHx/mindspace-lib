@@ -187,7 +187,7 @@ function RecordPaymentContent() {
     } else if (paymentType === "PARTIAL") {
       setAmountPaidToday(Math.round(netPay / 2));
     } else if (paymentType === "COLLECT_DUES") {
-      setAmountPaidToday(netPay);
+      setAmountPaidToday(selectedMemberObj?.outstanding_dues || 0);
       setDiscountAmount(0);
     }
   }, [paymentType, planFee, discountAmount, effectivePayable, durationTab, selectedMemberObj?.outstanding_dues]);
@@ -302,7 +302,6 @@ function RecordPaymentContent() {
 
   // Auto-calculated Dues
   const currDues = selectedMemberObj?.outstanding_dues || 0;
-  const targetDues = effectivePayable;
   let calculatedNewDues = 0;
   if (paymentType === "FULL") {
     calculatedNewDues = 0;
@@ -311,7 +310,7 @@ function RecordPaymentContent() {
   } else if (paymentType === "PAY_LATER") {
     calculatedNewDues = Math.round(effectivePayable);
   } else if (paymentType === "COLLECT_DUES") {
-    calculatedNewDues = Math.max(0, Math.round(targetDues - parseFloat(amountPaidToday || 0)));
+    calculatedNewDues = Math.max(0, Math.round(currDues - parseFloat(amountPaidToday || 0)));
   }
 
   // Pending Dues Warning & Block Check
