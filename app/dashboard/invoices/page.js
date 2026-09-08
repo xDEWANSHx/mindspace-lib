@@ -114,6 +114,11 @@ export default function InvoicesLedgerPage() {
     if (timeA !== timeB && !isNaN(timeA) && !isNaN(timeB) && timeA > 0 && timeB > 0) {
       return timeB - timeA;
     }
+    const cTimeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const cTimeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    if (cTimeA !== cTimeB && !isNaN(cTimeA) && !isNaN(cTimeB) && cTimeA > 0 && cTimeB > 0) {
+      return cTimeB - cTimeA;
+    }
     const numA = parseInt(String(a.invoice_id || '').replace(/\D/g, ''), 10) || 0;
     const numB = parseInt(String(b.invoice_id || '').replace(/\D/g, ''), 10) || 0;
     return numB - numA;
