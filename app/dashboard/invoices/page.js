@@ -377,9 +377,24 @@ export default function InvoicesLedgerPage() {
                   <div className="flex justify-between"><span>MODE:</span> <span className="uppercase">{previewInvoice.payment_mode}</span></div>
                 </div>
 
-                <div className="border-t border-b border-dashed border-black py-2 flex justify-between text-sm font-black text-black">
-                  <span>TOTAL PAID:</span>
-                  <span>₹{previewInvoice.amount}</span>
+                <div className="border-t border-b border-dashed border-black py-2 space-y-1 text-sm font-black text-black">
+                  <div className="flex justify-between">
+                    <span>TOTAL PAID:</span>
+                    <span>₹{previewInvoice.amount}</span>
+                  </div>
+                  {(() => {
+                    const matchDues = previewInvoice.notes?.match(/₹?\s*(\d+(?:\.\d+)?)\s*(?:Total\s+Overdue\s+Dues|Overdue\s+Dues|Total\s+Dues|Remaining\s+Dues|Dues\s+Remaining|Dues\s+Pending|Dues\s+Left|Pending\s+Dues)/i);
+                    const dVal = matchDues ? parseFloat(matchDues[1]) : (previewInvoice.payment_mode === 'Deferred' ? 600 : 0);
+                    if (dVal > 0) {
+                      return (
+                        <div className="flex justify-between text-xs text-black font-bold border-t border-dotted border-black pt-1">
+                          <span>PENDING DUES:</span>
+                          <span>₹{dVal}</span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
 
                 <div className="text-[9px] text-center text-black space-y-0.5 pt-1">

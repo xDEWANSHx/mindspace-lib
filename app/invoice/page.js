@@ -192,16 +192,31 @@ function InvoicePrintContent() {
   // Actual cash/online collected in THIS transaction receipt
   const paidAmount = parseFloat(payment.amount || 0);
 
+  // Parse Discount if present in notes
+  let invoiceDiscount = 0;
+  if (payment?.notes) {
+    const matchDisc = payment.notes.match(/Discount\s*(?:Given)?:\s*₹?\s*(\d+(?:\.\d+)?)/i)
+      || payment.notes.match(/Disc(?:ount)?:\s*₹?\s*(\d+(?:\.\d+)?)/i);
+    if (matchDisc && matchDisc[1]) {
+      invoiceDiscount = parseFloat(matchDisc[1]);
+    }
+  }
+
   // Determine full Base Plan amount for the student's subscription cycle
   let planAmount = 0;
   if (payment?.notes) {
-    const matchOf = payment.notes.match(/Paid\s*₹?\s*(\d+)\s*of\s*₹?\s*(\d+)/i);
+    const matchOf = payment.notes.match(/Paid\s*₹?\s*(\d+(?:\.\d+)?)\s*of\s*₹?\s*(\d+(?:\.\d+)?)/i);
     if (matchOf && matchOf[2]) {
       planAmount = parseFloat(matchOf[2]);
     }
-    const matchBase = payment.notes.match(/Base\s*Plan:\s*₹?\s*(\d+)/i);
+    const matchBase = payment.notes.match(/Base\s*Plan:\s*₹?\s*(\d+(?:\.\d+)?)/i);
     if (!planAmount && matchBase && matchBase[1]) {
       planAmount = parseFloat(matchBase[1]);
+    }
+    const matchTotalPlan = payment.notes.match(/Total\s*Plan:\s*₹?\s*(\d+(?:\.\d+)?)/i)
+      || payment.notes.match(/Plan\s*Fee:\s*₹?\s*(\d+(?:\.\d+)?)/i);
+    if (!planAmount && matchTotalPlan && matchTotalPlan[1]) {
+      planAmount = parseFloat(matchTotalPlan[1]);
     }
   }
 
@@ -214,42 +229,50 @@ function InvoicePrintContent() {
     planAmount = isHalfDay ? 600 : 1100;
   }
 
+  // Scheme detection
+  const isNotesPayLater = payment?.payment_mode === "Deferred" || (payment?.notes && /pay\s*later|deferred/i.test(payment.notes));
+  const isNotesPartial = payment?.notes && /partial\s*payment|partial\s*deposit/i.test(payment.notes);
+  const isNotesFull = payment?.notes && /full\s*subscription|full\s*payment|fully\s*paid/i.test(payment.notes);
+  const isNotesCollectDues = payment?.notes && /dues\s*recovery|collect\s*dues|pending\s*dues/i.test(payment.notes);
+
   // Parse remaining dues for THIS receipt snapshot:
   let remainingDuesAtReceipt = null;
   if (payment?.notes) {
-    const matchDues = payment.notes.match(/₹?\s*(\d+)\s*(?:Remaining\s*Dues|Dues\s*Pending|Dues\s*Remaining|Dues\s*Left|Overdue\s*Dues)/i);
+    const matchDues = payment.notes.match(/₹?\s*(\d+(?:\.\d+)?)\s*(?:Total\s+Overdue\s+Dues|Overdue\s+Dues|Total\s+Dues|Remaining\s+Dues|Dues\s+Remaining|Dues\s+Pending|Dues\s+Left|Pending\s+Dues)/i)
+      || payment.notes.match(/(?:Remaining\s*Dues|Dues\s*Pending|Dues\s*Remaining|Overdue\s*Dues|Total\s*Dues|Dues\s*Left|Pending\s*Dues):\s*₹?\s*(\d+(?:\.\d+)?)/i);
     if (matchDues && matchDues[1] !== undefined) {
       remainingDuesAtReceipt = parseFloat(matchDues[1]);
     }
   }
 
-  // If notes do not contain explicit snapshot dues, compute chronologically from memberPayments:
+  // Fallbacks if notes do not contain explicit snapshot dues:
   if (remainingDuesAtReceipt === null) {
-    const sortedMemPayments = [...memberPayments].sort((a, b) => {
-      const tA = new Date(a.paid_at || a.created_at || 0).getTime();
-      const tB = new Date(b.paid_at || b.created_at || 0).getTime();
-      if (tA !== tB) return tA - tB;
-      const numA = parseInt(String(a.invoice_id || '').replace(/\D/g, ''), 10) || 0;
-      const numB = parseInt(String(b.invoice_id || '').replace(/\D/g, ''), 10) || 0;
-      return numA - numB;
-    });
-
-    const thisIdx = sortedMemPayments.findIndex(p => p.id === payment.id || p.invoice_id === payment.invoice_id);
-    if (thisIdx !== -1) {
-      const paymentsUpToThis = sortedMemPayments.slice(0, thisIdx + 1);
-      const sumPaidUpToThis = paymentsUpToThis.reduce((acc, p) => acc + parseFloat(p.amount || 0), 0);
-      remainingDuesAtReceipt = Math.max(0, planAmount - sumPaidUpToThis);
+    if (isNotesPayLater || (paidAmount === 0 && (payment.payment_mode === "Deferred" || (member?.outstanding_dues && member.outstanding_dues > 0)))) {
+      remainingDuesAtReceipt = Math.max(0, planAmount - invoiceDiscount);
+    } else if (isNotesFull || (paidAmount >= (planAmount - invoiceDiscount) && paidAmount > 0)) {
+      remainingDuesAtReceipt = 0;
+    } else if (isNotesPartial) {
+      remainingDuesAtReceipt = Math.max(0, planAmount - invoiceDiscount - paidAmount);
+    } else if (isNotesCollectDues) {
+      remainingDuesAtReceipt = Math.max(0, (member?.outstanding_dues || 0) - paidAmount);
     } else {
-      remainingDuesAtReceipt = Math.max(0, planAmount - paidAmount);
+      if (paidAmount === 0) {
+        remainingDuesAtReceipt = Math.max(0, planAmount - invoiceDiscount);
+      } else if (paidAmount >= (planAmount - invoiceDiscount)) {
+        remainingDuesAtReceipt = 0;
+      } else {
+        remainingDuesAtReceipt = Math.max(0, planAmount - invoiceDiscount - paidAmount);
+      }
     }
   }
 
-  // Calculate previously paid in this cycle
-  const previouslyPaidInCycle = Math.max(0, planAmount - paidAmount - remainingDuesAtReceipt);
+  // Calculate previously paid in this specific subscription cycle
+  const netPayable = Math.max(0, planAmount - invoiceDiscount);
+  const previouslyPaidInCycle = Math.max(0, netPayable - paidAmount - remainingDuesAtReceipt);
 
   const isReceiptFullySettled = (remainingDuesAtReceipt === 0);
-  const isPayLater = paidAmount === 0 && remainingDuesAtReceipt > 0;
-  const isPartial = paidAmount > 0 && remainingDuesAtReceipt > 0;
+  const isPayLater = isNotesPayLater || (paidAmount === 0 && remainingDuesAtReceipt > 0);
+  const isPartial = !isPayLater && remainingDuesAtReceipt > 0;
 
   // Dynamic Duration Text (e.g., "15 Days", "3 Days", "1 Month", etc.)
   let durationText = "1 Month";
@@ -302,14 +325,6 @@ function InvoicePrintContent() {
     }
   }
 
-  let invoiceDiscount = 0;
-  if (payment?.notes) {
-    const matchDisc = payment.notes.match(/Discount\s*(?:Given)?:\s*₹?\s*(\d+)/i);
-    if (matchDisc && matchDisc[1]) {
-      invoiceDiscount = parseFloat(matchDisc[1]);
-    }
-  }
-
   // Locker Details for Invoice: prioritize Student Directory (member.has_locker)
   const hasLocker = member
     ? !!member.has_locker
@@ -355,6 +370,7 @@ function InvoicePrintContent() {
       `Allotment ID: ${studentAllotmentNo}\n` +
       `Seat Allocated: ${seatNo} (${shiftName})\n` +
       `Total Subscription Plan: ₹${planAmount}\n` +
+      (invoiceDiscount > 0 ? `Discount Given: ₹${invoiceDiscount}\n` : ``) +
       (previouslyPaidInCycle > 0 ? `Previously Paid in Cycle: ₹${previouslyPaidInCycle}\n` : ``) +
       (isPayLater
         ? `Payment Status: PAY LATER (₹${remainingDuesAtReceipt} dues pending)\n`
@@ -366,7 +382,7 @@ function InvoicePrintContent() {
       if (promisedDateFormatted) {
         message += `Promised Dues Payment Date: ${promisedDateFormatted} ${isPromisedOverdue ? '(OVERDUE)' : ''}\n`;
       }
-      message += `Status: PARTIAL / DUES PENDING\n`;
+      message += isPayLater ? `Status: PAY LATER (DUES PENDING)\n` : `Status: PARTIAL / DUES PENDING\n`;
     } else {
       message += `Status: FULLY SETTLED (All Dues Cleared)\n`;
     }
@@ -703,7 +719,7 @@ function InvoicePrintContent() {
               </div>
               <div>
                 <p className="font-black text-sm tracking-wide uppercase">
-                  {isReceiptFullySettled ? "FULLY SETTLED" : "PARTIAL / DUES PENDING"}
+                  {isReceiptFullySettled ? "FULLY SETTLED" : isPayLater ? "PAY LATER / DUES PENDING" : "PARTIAL / DUES PENDING"}
                 </p>
                 <p className="text-[11px] font-medium opacity-90 mt-0.5">
                   {isReceiptFullySettled
