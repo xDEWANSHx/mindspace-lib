@@ -242,6 +242,44 @@ export default function MembersDirectoryPage() {
     );
   };
 
+  const handleEditShiftChange = (newShiftVal) => {
+    const s = String(newShiftVal || '').toLowerCase();
+    const isHalf = s.includes("morning") || s.includes("evening") || s.includes("half");
+    const baseShiftPrice = isHalf ? 600 : 1100;
+    const lockerAdd = editData.has_locker ? 50 : 0;
+    const newPlanAmt = baseShiftPrice + lockerAdd;
+    setEditData(prev => {
+      const prevPlan = parseFloat(prev.plan_amount) || 1100;
+      const prevDues = parseFloat(prev.outstanding_dues) || 0;
+      const shouldUpdateDues = prevDues === 0 || prevDues === prevPlan || prevDues === 1100 || prevDues === 600 || prevDues === 1150 || prevDues === 650 || prev.payment_status === "UNPAID";
+      return {
+        ...prev,
+        shift: newShiftVal,
+        plan_amount: newPlanAmt,
+        outstanding_dues: (prevDues > 0 && shouldUpdateDues) ? newPlanAmt : prevDues
+      };
+    });
+  };
+
+  const handleEditLockerToggle = (nextHasLocker) => {
+    const s = String(editData.shift || '').toLowerCase();
+    const isHalf = s.includes("morning") || s.includes("evening") || s.includes("half");
+    const baseShiftPrice = isHalf ? 600 : 1100;
+    const lockerAdd = nextHasLocker ? 50 : 0;
+    const newPlanAmt = baseShiftPrice + lockerAdd;
+    setEditData(prev => {
+      const prevPlan = parseFloat(prev.plan_amount) || 1100;
+      const prevDues = parseFloat(prev.outstanding_dues) || 0;
+      const shouldUpdateDues = prevDues === 0 || prevDues === prevPlan || prevDues === 1100 || prevDues === 600 || prevDues === 1150 || prevDues === 650 || prev.payment_status === "UNPAID";
+      return {
+        ...prev,
+        has_locker: nextHasLocker,
+        plan_amount: newPlanAmt,
+        outstanding_dues: (prevDues > 0 && shouldUpdateDues) ? newPlanAmt : prevDues
+      };
+    });
+  };
+
   // Action: Open Edit Modal with ALL FIELDS initialized
   const openEditModal = (m) => {
     setSelectedMember(m);
@@ -250,6 +288,17 @@ export default function MembersDirectoryPage() {
     const subExpiryVal = (m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970"))
       ? String(m.subscription_end_date).substring(0, 10)
       : (dates.subExpiry !== "--" ? dates.subExpiry : "");
+
+    const s = String(m.shift || '').toLowerCase();
+    const isHalf = s.includes("morning") || s.includes("evening") || s.includes("half");
+    const standardRate = (isHalf ? 600 : 1100) + (m.has_locker ? 50 : 0);
+    let initialPlanAmt = standardRate;
+    if (m.plan_amount !== undefined && m.plan_amount !== null && !isNaN(parseFloat(m.plan_amount))) {
+      const p = parseFloat(m.plan_amount);
+      if (p !== 1100 && p !== 600 && p !== 1150 && p !== 650 && p > 0) {
+        initialPlanAmt = p;
+      }
+    }
 
     setEditData({
       full_name: m.full_name || "",
@@ -266,7 +315,7 @@ export default function MembersDirectoryPage() {
       joining_date: m.joining_date ? String(m.joining_date).substring(0, 10) : "",
       sub_start_date: subStartVal,
       subscription_end_date: subExpiryVal,
-      plan_amount: m.plan_amount !== undefined ? m.plan_amount : 1100,
+      plan_amount: initialPlanAmt,
       outstanding_dues: m.outstanding_dues !== undefined ? m.outstanding_dues : 0,
       pay_later: m.pay_later || false,
       due_date: m.due_date ? String(m.due_date).substring(0, 10) : (m.dues_due_date ? String(m.dues_due_date).substring(0, 10) : ""),
@@ -1137,7 +1186,7 @@ export default function MembersDirectoryPage() {
                   <label className="text-slate-500 font-bold mb-1 block">Shift Plan *</label>
                   <select
                     value={editData.shift}
-                    onChange={(e) => setEditData({ ...editData, shift: e.target.value })}
+                    onChange={(e) => handleEditShiftChange(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-800 outline-none font-bold"
                   >
                     <option value="Full Day">Full Day Access (06:00 AM - 10:00 PM)</option>
@@ -1167,7 +1216,7 @@ export default function MembersDirectoryPage() {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setEditData({ ...editData, has_locker: !editData.has_locker })}
+                        onClick={() => handleEditLockerToggle(!editData.has_locker)}
                         className={`px-4 py-1.5 rounded-full text-xs font-black transition-all ${
                           editData.has_locker ? "bg-purple-600 text-white shadow-md" : "bg-slate-200 text-slate-600"
                         }`}

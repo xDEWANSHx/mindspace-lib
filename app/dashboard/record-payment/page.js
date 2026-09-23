@@ -152,8 +152,11 @@ function RecordPaymentContent() {
     const isHalfDay = selectedMemberObj?.shift === "Morning" || selectedMemberObj?.shift === "Evening";
     
     // Exact standard shift rates: Full Day (1100 / 600) | Half Day (600 / 400)
-    const baseMonthlyRate = isHalfDay ? 600 : 1100;
-    const monthlyRate = includeLocker ? (baseMonthlyRate + fee) : baseMonthlyRate;
+    const defaultShiftRate = isHalfDay ? 600 : 1100;
+    const baseMonthlyRate = (selectedMemberObj?.plan_amount && selectedMemberObj.plan_amount !== 1100 && selectedMemberObj.plan_amount !== 600)
+      ? selectedMemberObj.plan_amount
+      : defaultShiftRate;
+    const monthlyRate = includeLocker ? (baseMonthlyRate + (selectedMemberObj?.has_locker ? 0 : fee)) : baseMonthlyRate;
 
     const base15DayRate = isHalfDay ? 400 : 600;
     const fifteenDayRate = includeLocker ? (base15DayRate + fee) : base15DayRate;
@@ -170,7 +173,7 @@ function RecordPaymentContent() {
       setPlanFee(monthlyRate * 12);
     }
     // In CUSTOM mode, planFee is managed directly by Admin's manual Net Payable input!
-  }, [durationTab, selectedMemberId, selectedMemberObj?.shift, includeLocker, lockerFee]);
+  }, [durationTab, selectedMemberId, selectedMemberObj?.shift, selectedMemberObj?.plan_amount, selectedMemberObj?.has_locker, includeLocker, lockerFee]);
 
   const parsedDiscount = Math.max(0, parseFloat(discountAmount || 0));
   const effectivePayable = Math.max(0, parseFloat(planFee || 0) - parsedDiscount);
@@ -237,8 +240,14 @@ function RecordPaymentContent() {
 
   const getDefaultSubStartDate = (m) => {
     if (!m) return paidDate || formatDate(new Date());
+    const memPayments = (payments || []).filter(p =>
+      p.member_id === m.id ||
+      p.member_id === m.permanent_id ||
+      p.member_id === m.student_no ||
+      (p.member_name && m.full_name && p.member_name.trim().toLowerCase() === m.full_name.trim().toLowerCase())
+    );
     const hasValidSub = m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970");
-    if (hasValidSub) {
+    if (hasValidSub && m.outstanding_dues === 0 && m.payment_status === "PAID" && memPayments.length > 0) {
       return addDaysToDate(m.subscription_end_date, 1);
     }
     return m.joining_date || paidDate || formatDate(new Date());
@@ -252,11 +261,15 @@ function RecordPaymentContent() {
     return { start: subStart, end: subEnd };
   };
 
-  // Auto-sync locker/date state when student selected (Runs ONLY when selectedMemberId changes!)
+  // Auto-sync locker/date state when student selected or member state changes
   useEffect(() => {
     if (selectedMemberObj) {
       setIncludeLocker(!!selectedMemberObj.has_locker);
       setOverrideExpiryDate("");
+
+      const isHalf = selectedMemberObj.shift === "Morning" || selectedMemberObj.shift === "Evening";
+      const defaultRate = isHalf ? 600 : 1100;
+      const memPlanAmt = (selectedMemberObj.plan_amount !== undefined && selectedMemberObj.plan_amount !== null && !isNaN(parseFloat(selectedMemberObj.plan_amount))) ? parseFloat(selectedMemberObj.plan_amount) : defaultRate;
 
       if (selectedMemberObj.outstanding_dues > 0) {
         setPaymentType("COLLECT_DUES");
@@ -266,13 +279,13 @@ function RecordPaymentContent() {
         setOverrideExpiryDate(cycle.end);
       } else {
         setPaymentType("FULL");
-        setPlanFee(selectedMemberObj.plan_amount || 1100);
-        setAmountPaidToday(selectedMemberObj.plan_amount || 1100);
+        setPlanFee(memPlanAmt);
+        setAmountPaidToday(memPlanAmt);
         setJoiningDate(getDefaultSubStartDate(selectedMemberObj));
         setOverrideExpiryDate("");
       }
     }
-  }, [selectedMemberId]);
+  }, [selectedMemberId, selectedMemberObj?.outstanding_dues, selectedMemberObj?.subscription_end_date, selectedMemberObj?.plan_amount, selectedMemberObj?.shift, selectedMemberObj?.payment_status]);
 
   // Adjust joining date when switching paymentType
   useEffect(() => {
@@ -484,6 +497,25 @@ function RecordPaymentContent() {
     }
   };
 
+  const handleQuickEditShiftChange = (newShiftVal) => {
+    const s = String(newShiftVal || '').toLowerCase();
+    const isHalf = s.includes("morning") || s.includes("evening") || s.includes("half");
+    const baseShiftPrice = isHalf ? 600 : 1100;
+    const lockerAdd = managedStudent?.has_locker ? 50 : 0;
+    const newPlanAmt = baseShiftPrice + lockerAdd;
+    setEditFormData(prev => {
+      const prevPlan = parseFloat(prev.plan_amount) || 1100;
+      const prevDues = parseFloat(prev.outstanding_dues) || 0;
+      const shouldUpdateDues = prevDues === 0 || prevDues === prevPlan || prevDues === 1100 || prevDues === 600 || prevDues === 1150 || prevDues === 650 || prev.payment_status === "UNPAID";
+      return {
+        ...prev,
+        shift: newShiftVal,
+        plan_amount: newPlanAmt,
+        outstanding_dues: (prevDues > 0 && shouldUpdateDues) ? newPlanAmt : prevDues
+      };
+    });
+  };
+
   const handleOpenManageStudent = (memberId, fallbackName) => {
     let target = members.find(m => m.id === memberId);
     if (!target && fallbackName) {
@@ -496,6 +528,20 @@ function RecordPaymentContent() {
       const dates = getMemberSubscriptionDates(target, payments);
       const subStartVal = dates.subStart !== "--" ? dates.subStart : "";
       const subExpiryVal = (target.subscription_end_date && !String(target.subscription_end_date).startsWith("1970")) ? target.subscription_end_date : (dates.subExpiry !== "--" ? dates.subExpiry : "");
+      
+      const s = String(target.shift || '').toLowerCase();
+      const isHalf = s.includes("morning") || s.includes("evening") || s.includes("half");
+      const baseShiftPrice = isHalf ? 600 : 1100;
+      const lockerAdd = target.has_locker ? 50 : 0;
+      const standardRate = baseShiftPrice + lockerAdd;
+
+      let initialPlanAmt = standardRate;
+      if (target.plan_amount !== undefined && target.plan_amount !== null && !isNaN(parseFloat(target.plan_amount))) {
+        const p = parseFloat(target.plan_amount);
+        if (p !== 1100 && p !== 600 && p !== 1150 && p !== 650 && p > 0) {
+          initialPlanAmt = p;
+        }
+      }
 
       setEditFormData({
         full_name: target.full_name || "",
@@ -505,9 +551,9 @@ function RecordPaymentContent() {
         joining_date: joinStr,
         sub_start_date: subStartVal,
         subscription_end_date: subExpiryVal,
-        plan_amount: target.plan_amount || 1100,
+        plan_amount: initialPlanAmt,
         outstanding_dues: target.outstanding_dues || 0,
-        payment_status: target.outstanding_dues > 0 ? (target.outstanding_dues < (target.plan_amount || 1100) ? "PARTIAL" : "UNPAID") : "PAID"
+        payment_status: target.outstanding_dues > 0 ? (target.outstanding_dues < initialPlanAmt ? "PARTIAL" : "UNPAID") : "PAID"
       });
       setManageStudentModalOpen(true);
     } else {
@@ -1780,7 +1826,7 @@ function RecordPaymentContent() {
                   <label className="text-slate-500 font-bold mb-1 block">Shift Plan</label>
                   <select
                     value={editFormData.shift}
-                    onChange={(e) => setEditFormData({ ...editFormData, shift: e.target.value })}
+                    onChange={(e) => handleQuickEditShiftChange(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-slate-900 font-bold"
                   >
                     <option value="Full Day">Full Day Access (06:00 AM - 10:00 PM)</option>
