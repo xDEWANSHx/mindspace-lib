@@ -421,9 +421,9 @@ function RecordPaymentContent() {
     let defaultNote = "";
     let isRenewalAction = false;
 
-    const planDurationLabel = durationTab === "15D" ? "15 Days" : `${extendDays} days`;
+    const planDurationLabel = durationTab === "15D" ? "15 Days" : (durationTab === "CUSTOM" ? `${extendDays} Days` : `${extendDays} days`);
     if (paymentType === "FULL") {
-      defaultNote = `Full Subscription Renewal (${planDurationLabel}, Paid ₹${parsedPaidToday} of ₹${effectivePayable}, ₹0 Remaining Dues)`;
+      defaultNote = `Full Subscription Payment (${planDurationLabel}, Paid ₹${parsedPaidToday} of ₹${effectivePayable}, ₹0 Remaining Dues)`;
       if (parsedDiscount > 0) defaultNote += ` [Discount Given: ₹${parsedDiscount}]`;
       isRenewalAction = true;
     } else if (paymentType === "PARTIAL") {
@@ -435,9 +435,14 @@ function RecordPaymentContent() {
       if (parsedDiscount > 0) defaultNote += ` [Discount Given: ₹${parsedDiscount}]`;
       isRenewalAction = true;
     } else if (paymentType === "COLLECT_DUES") {
-      const fullCyclePlan = selectedMemberObj.plan_amount || 1100;
-      defaultNote = `Pending Dues Recovery (Paid ₹${parsedPaidToday} of ₹${fullCyclePlan}, ₹${calculatedNewDues} Remaining Dues)`;
-      isRenewalAction = false;
+      if (durationTab === "15D" || durationTab === "3M" || durationTab === "6M" || durationTab === "12M" || durationTab === "CUSTOM") {
+        defaultNote = `Subscription Payment (${planDurationLabel}, Paid ₹${parsedPaidToday} of ₹${effectivePayable}, ₹${calculatedNewDues} Remaining Dues)`;
+        isRenewalAction = true;
+      } else {
+        const fullCyclePlan = selectedMemberObj.plan_amount || effectivePayable || 1100;
+        defaultNote = `Dues Settlement (${planDurationLabel}, Paid ₹${parsedPaidToday} of ₹${fullCyclePlan}, ₹${calculatedNewDues} Remaining Dues)`;
+        isRenewalAction = false;
+      }
     }
 
     let finalNote = notes ? `${notes} - ${defaultNote}` : defaultNote;
