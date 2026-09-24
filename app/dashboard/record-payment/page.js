@@ -178,7 +178,7 @@ function RecordPaymentContent() {
   const parsedDiscount = Math.max(0, parseFloat(discountAmount || 0));
   const effectivePayable = Math.max(0, parseFloat(planFee || 0) - parsedDiscount);
 
-  // Sync payment type & discount to amount paid today
+  // Sync payment type & discount & duration to amount paid today
   useEffect(() => {
     const pDisc = Math.max(0, parseFloat(discountAmount || 0));
     const netPay = Math.max(0, parseFloat(planFee || 0) - pDisc);
@@ -190,10 +190,10 @@ function RecordPaymentContent() {
     } else if (paymentType === "PARTIAL") {
       setAmountPaidToday(Math.round(netPay / 2));
     } else if (paymentType === "COLLECT_DUES") {
-      setAmountPaidToday(selectedMemberObj?.outstanding_dues || 0);
+      setAmountPaidToday(netPay);
       setDiscountAmount(0);
     }
-  }, [paymentType, planFee, discountAmount, effectivePayable, durationTab, selectedMemberObj?.outstanding_dues]);
+  }, [paymentType, planFee, discountAmount, effectivePayable, durationTab]);
 
   useEffect(() => {
     async function load() {
@@ -323,7 +323,11 @@ function RecordPaymentContent() {
   } else if (paymentType === "PAY_LATER") {
     calculatedNewDues = Math.round(effectivePayable);
   } else if (paymentType === "COLLECT_DUES") {
-    calculatedNewDues = Math.max(0, Math.round(currDues - parseFloat(amountPaidToday || 0)));
+    if (durationTab === "15D") {
+      calculatedNewDues = Math.max(0, Math.round(effectivePayable - parseFloat(amountPaidToday || 0)));
+    } else {
+      calculatedNewDues = Math.max(0, Math.round(currDues - parseFloat(amountPaidToday || 0)));
+    }
   }
 
   // Pending Dues Warning & Block Check
