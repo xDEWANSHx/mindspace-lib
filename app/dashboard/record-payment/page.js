@@ -664,10 +664,24 @@ function RecordPaymentContent() {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
 
+    const memPayments = (payments || []).filter(p =>
+      p.member_id === m.id ||
+      p.member_id === m.permanent_id ||
+      p.member_id === m.student_no ||
+      (p.member_name && m.full_name && p.member_name.trim().toLowerCase() === m.full_name.trim().toLowerCase())
+    );
+    const hasAnyPayment = memPayments.length > 0;
+
+    const isHalfDay = m.shift === 'Morning' || m.shift === 'Evening';
+    const defaultFee = isHalfDay ? 600 : 1100;
+    const lockerAdd = m.has_locker ? 50 : 0;
+    const planFee = (m.plan_amount || defaultFee) + lockerAdd;
+    const effectiveDues = (m.outstanding_dues > 0) ? m.outstanding_dues : (!hasAnyPayment ? planFee : 0);
+
     const dueDateStr = m.due_date || m.dues_due_date;
     let isDueDatePassed = false;
     let hasDueDate = false;
-    if (m.outstanding_dues > 0 && dueDateStr) {
+    if (effectiveDues > 0 && dueDateStr) {
       const parts = String(dueDateStr).substring(0, 10).split('-').map(Number);
       if (parts.length === 3 && !isNaN(parts[0])) {
         hasDueDate = true;
@@ -679,7 +693,7 @@ function RecordPaymentContent() {
       }
     }
 
-    const hasValidSub = m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970");
+    const hasValidSub = hasAnyPayment && m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970");
     const end = hasValidSub ? new Date(m.subscription_end_date) : null;
     if (end) end.setHours(0, 0, 0, 0);
     const diffDays = end ? Math.ceil((end - now) / (1000 * 60 * 60 * 24)) : 999;
@@ -688,12 +702,12 @@ function RecordPaymentContent() {
     if (hasValidSub && diffDays < 0) {
       return { label: `Overdue (${Math.abs(diffDays)}d)`, color: "bg-rose-100 text-rose-800 border border-rose-300 font-extrabold" };
     }
-    if (m.outstanding_dues > 0 && isDueDatePassed) {
-      return { label: `₹${m.outstanding_dues} Overdue`, color: "bg-rose-100 text-rose-800 border border-rose-300 font-extrabold" };
+    if (effectiveDues > 0 && isDueDatePassed) {
+      return { label: `₹${effectiveDues} Overdue`, color: "bg-rose-100 text-rose-800 border border-rose-300 font-extrabold" };
     }
 
-    // 2. Unpaid admission dues check (Day 0 = Pending, Day 1+ = Overdue)
-    if (m.outstanding_dues > 0) {
+    // 2. Unpaid / pending dues check
+    if (effectiveDues > 0) {
       if (!hasValidSub) {
         const joinStr = m.joining_date || (m.created_at ? m.created_at.substring(0, 10) : formatDate(now));
         const jParts = String(joinStr).substring(0, 10).split('-').map(Number);
@@ -703,11 +717,11 @@ function RecordPaymentContent() {
           const daysSince = Math.floor((now - joinDate) / (1000 * 60 * 60 * 24));
 
           if (daysSince >= 1 && !hasDueDate) {
-            return { label: `Overdue (${daysSince}d)`, color: "bg-rose-100 text-rose-800 border border-rose-300 font-extrabold" };
+            return { label: `₹${effectiveDues} Pending`, color: "bg-amber-100 text-amber-900 border border-amber-300 font-extrabold" };
           }
         }
       }
-      return { label: `₹${m.outstanding_dues} Pending`, color: "bg-amber-100 text-amber-900 border border-amber-300 font-extrabold" };
+      return { label: `₹${effectiveDues} Pending`, color: "bg-amber-100 text-amber-900 border border-amber-300 font-extrabold" };
     }
 
     // 3. Due soon -> AMBER
@@ -715,7 +729,12 @@ function RecordPaymentContent() {
       return { label: `Due Soon (${diffDays}d)`, color: "bg-amber-100 text-amber-800 border border-amber-300 font-extrabold" };
     }
 
-    // 4. Paid active -> GREEN
+    // 4. No valid subscription -> Unpaid
+    if (!hasValidSub) {
+      return { label: "Unpaid / Not Active", color: "bg-slate-100 text-slate-700 border border-slate-300 font-bold" };
+    }
+
+    // 5. Paid active -> GREEN
     return { label: "Paid (Active)", color: "bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold" };
   };
 
@@ -874,7 +893,7 @@ function RecordPaymentContent() {
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
-                          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${m.outstanding_dues > 0 ? "bg-amber-500" : "bg-emerald-500"}`} />
+                          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${m.outstanding_dues > 0 || !(payments || []).some(p => p.member_id === m.id || p.member_id === m.permanent_id || (p.member_name && m.full_name && p.member_name.trim().toLowerCase() === m.full_name.trim().toLowerCase())) ? "bg-amber-500" : "bg-emerald-500"}`} />
                           <div>
                             <p className="font-extrabold text-slate-900 text-xs">{m.full_name}</p>
                             <p className="text-[10px] text-slate-400 font-mono">
@@ -934,14 +953,18 @@ function RecordPaymentContent() {
                   <div className="bg-white/80 backdrop-blur-xs p-3 rounded-2xl border border-slate-200/80 shadow-2xs col-span-2 flex justify-between items-center">
                     <div>
                       <span className="text-[9px] uppercase font-mono font-extrabold text-slate-400 block tracking-wider">EXPIRY / VALID TILL</span>
-                      <span className="text-slate-800 font-mono font-bold text-xs">{(selectedMemberObj.subscription_end_date && !String(selectedMemberObj.subscription_end_date).startsWith("1970")) ? selectedMemberObj.subscription_end_date : "--"}</span>
+                      <span className="text-slate-800 font-mono font-bold text-xs">
+                        {((payments || []).some(p => p.member_id === selectedMemberObj.id || p.member_id === selectedMemberObj.permanent_id || (p.member_name && selectedMemberObj.full_name && p.member_name.trim().toLowerCase() === selectedMemberObj.full_name.trim().toLowerCase())) && selectedMemberObj.subscription_end_date && !String(selectedMemberObj.subscription_end_date).startsWith("1970"))
+                          ? selectedMemberObj.subscription_end_date
+                          : "Not Set"}
+                      </span>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-[10px] font-black border ${getMemberBadgeInfo(selectedMemberObj).color}`}>
                       {getMemberBadgeInfo(selectedMemberObj).label}
                     </span>
                   </div>
 
-                  {selectedMemberObj.outstanding_dues > 0 && (
+                  {((selectedMemberObj.outstanding_dues > 0) || !(payments || []).some(p => p.member_id === selectedMemberObj.id || p.member_id === selectedMemberObj.permanent_id || (p.member_name && selectedMemberObj.full_name && p.member_name.trim().toLowerCase() === selectedMemberObj.full_name.trim().toLowerCase()))) && (
                     <div className="bg-amber-50/90 backdrop-blur-xs p-3 rounded-2xl border border-amber-200/90 shadow-2xs col-span-2 flex justify-between items-center">
                       <div>
                         <span className="text-[9px] uppercase font-mono font-extrabold text-amber-600 block tracking-wider">PROMISED PAYMENT DUE DATE</span>
@@ -950,7 +973,7 @@ function RecordPaymentContent() {
                         </span>
                       </div>
                       <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-300">
-                        ₹{selectedMemberObj.outstanding_dues} Dues
+                        ₹{selectedMemberObj.outstanding_dues > 0 ? selectedMemberObj.outstanding_dues : ((selectedMemberObj.shift === "Morning" || selectedMemberObj.shift === "Evening") ? 600 : 1100) + (selectedMemberObj.has_locker ? 50 : 0)} Dues
                       </span>
                     </div>
                   )}
