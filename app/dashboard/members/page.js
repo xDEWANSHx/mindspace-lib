@@ -168,7 +168,7 @@ export default function MembersDirectoryPage() {
 
   // Filtered and sorted members calculation
   const filteredMembers = members.filter((m) => {
-    const status = calculateMemberStatus(m);
+    const status = calculateMemberStatus(m, payments);
 
     if (activeTab === "ACTIVE" && status !== "ACTIVE") return false;
     if (activeTab === "PENDING" && status !== "PENDING") return false;
@@ -770,7 +770,19 @@ export default function MembersDirectoryPage() {
           /* Grid View Cards */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {filteredMembers.map((m) => {
-              const status = calculateMemberStatus(m);
+              const status = calculateMemberStatus(m, payments);
+              const memHasPayments = payments.some(p =>
+                p.member_id === m.id ||
+                p.member_id === m.permanent_id ||
+                p.member_id === m.student_no ||
+                (p.member_name && m.full_name && p.member_name.trim().toLowerCase() === m.full_name.trim().toLowerCase())
+              );
+              const isHalf = m.shift === 'Morning' || m.shift === 'Evening';
+              const defaultFee = isHalf ? 600 : 1100;
+              const lockerAdd = m.has_locker ? 50 : 0;
+              const planFee = (m.plan_amount || defaultFee) + lockerAdd;
+              const displayDues = (m.outstanding_dues > 0) ? m.outstanding_dues : (!memHasPayments ? planFee : 0);
+
               return (
                 <div
                   key={m.id}
@@ -817,7 +829,7 @@ export default function MembersDirectoryPage() {
                     </div>
                     <div>
                       <span className="text-[9px] uppercase text-slate-400 font-extrabold block">Dues</span>
-                      <p className="font-mono font-bold text-amber-600">₹{m.outstanding_dues || 0}</p>
+                      <p className="font-mono font-bold text-amber-600">₹{displayDues}</p>
                     </div>
                   </div>
                 </div>
@@ -843,7 +855,20 @@ export default function MembersDirectoryPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredMembers.map((m) => {
-                    const status = calculateMemberStatus(m);
+                    const status = calculateMemberStatus(m, payments);
+                    const memHasPayments = payments.some(p =>
+                      p.member_id === m.id ||
+                      p.member_id === m.permanent_id ||
+                      p.member_id === m.student_no ||
+                      (p.member_name && m.full_name && p.member_name.trim().toLowerCase() === m.full_name.trim().toLowerCase())
+                    );
+                    const isHalf = m.shift === 'Morning' || m.shift === 'Evening';
+                    const defaultFee = isHalf ? 600 : 1100;
+                    const lockerAdd = m.has_locker ? 50 : 0;
+                    const planFee = (m.plan_amount || defaultFee) + lockerAdd;
+                    const displayDues = (m.outstanding_dues > 0) ? m.outstanding_dues : (!memHasPayments ? planFee : 0);
+                    const hasValidSub = memHasPayments && m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970");
+
                     return (
                       <tr
                         key={m.id}
@@ -859,7 +884,7 @@ export default function MembersDirectoryPage() {
                         <td className="p-4 font-mono text-purple-700 font-bold">
                           {m.has_locker ? (m.locker_no || "Yes") : "No"}
                         </td>
-                        <td className="p-4 font-mono text-slate-600">{(m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970")) ? m.subscription_end_date : "--"}</td>
+                        <td className="p-4 font-mono text-slate-600">{hasValidSub ? m.subscription_end_date : "--"}</td>
                         <td className="p-4">
                           <span
                             className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase ${
@@ -872,7 +897,7 @@ export default function MembersDirectoryPage() {
                           </span>
                         </td>
                         <td className="p-4 text-right font-mono font-bold text-amber-600">
-                          {m.left_with_dues ? `Loss: ₹${m.loss_amount}` : `₹${m.outstanding_dues}`}
+                          {m.left_with_dues ? `Loss: ₹${m.loss_amount}` : `₹${displayDues}`}
                         </td>
                       </tr>
                     );
