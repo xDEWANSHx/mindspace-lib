@@ -247,7 +247,7 @@ function RecordPaymentContent() {
       (p.member_name && m.full_name && p.member_name.trim().toLowerCase() === m.full_name.trim().toLowerCase())
     );
     const hasValidSub = m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970");
-    if (hasValidSub && m.outstanding_dues === 0 && m.payment_status === "PAID" && memPayments.length > 0) {
+    if (hasValidSub && (!m.outstanding_dues || parseFloat(m.outstanding_dues) === 0)) {
       return addDaysToDate(m.subscription_end_date, 1);
     }
     return m.joining_date || paidDate || formatDate(new Date());

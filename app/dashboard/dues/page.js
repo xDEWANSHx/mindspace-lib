@@ -44,6 +44,20 @@ export default function DuesTrackerPage() {
     load();
   }, [activeBranch]);
 
+  const getMemberFee = (m) => {
+    const isHalf = m.shift === 'Morning' || m.shift === 'Evening';
+    const defaultFee = isHalf ? 600 : 1100;
+    const lockerAdd = m.has_locker ? 50 : 0;
+    return (m.plan_amount || defaultFee) + lockerAdd;
+  };
+
+  const getMemberDues = (m) => {
+    if (m.outstanding_dues !== undefined && m.outstanding_dues !== null && parseFloat(m.outstanding_dues) > 0) {
+      return parseFloat(m.outstanding_dues);
+    }
+    return getMemberFee(m);
+  };
+
   const duesMembers = members.filter(m => {
     const status = calculateMemberStatus(m);
     const hasDues = status === "OVERDUE" || status === "PENDING" || status === "DUE_SOON";
@@ -57,9 +71,8 @@ export default function DuesTrackerPage() {
     }
     return true;
   }).sort((a, b) => {
-    const getVal = (m) => parseFloat(m.outstanding_dues > 0 ? m.outstanding_dues : (m.plan_amount || 1100));
-    if (sortBy === "dues-desc") return getVal(b) - getVal(a);
-    if (sortBy === "dues-asc") return getVal(a) - getVal(b);
+    if (sortBy === "dues-desc") return getMemberDues(b) - getMemberDues(a);
+    if (sortBy === "dues-asc") return getMemberDues(a) - getMemberDues(b);
     if (sortBy === "name-asc") return (a.full_name || "").localeCompare(b.full_name || "");
     if (sortBy === "oldest") {
       const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -74,9 +87,7 @@ export default function DuesTrackerPage() {
 
   // Accurately sum total outstanding dues without false inflation
   const totalDuesAmount = duesMembers.reduce((sum, m) => {
-    const status = calculateMemberStatus(m);
-    const val = parseFloat(m.outstanding_dues > 0 ? m.outstanding_dues : (status === "OVERDUE" || status === "DUE_SOON" ? (m.plan_amount || 1100) : 0));
-    return sum + val;
+    return sum + getMemberDues(m);
   }, 0);
 
   const overdueCount  = members.filter(m => calculateMemberStatus(m) === "OVERDUE"  && m.is_active).length;
@@ -87,14 +98,14 @@ export default function DuesTrackerPage() {
     const columns = ["ID", "Student Name", "Mobile", "Seat", "Shift", "Due Date / Expiry", "Dues Amount", "Status"];
     const rows = duesMembers.map(m => {
       const status = calculateMemberStatus(m);
-      const duesVal = m.outstanding_dues > 0 ? m.outstanding_dues : (m.plan_amount || 1100);
+      const duesVal = getMemberDues(m);
       return [
         m.permanent_id || "-",
         m.full_name,
         m.mobile,
         m.seat_no || "Unassigned",
         m.shift || "Full Day",
-        m.subscription_end_date || m.due_date || "-",
+        (m.outstanding_dues > 0 && (m.due_date || m.dues_due_date)) ? (m.due_date || m.dues_due_date) : (m.subscription_end_date?.substring(0, 10) || "-"),
         `Rs. ${duesVal}`,
         status
       ];
@@ -227,7 +238,7 @@ export default function DuesTrackerPage() {
             duesMembers.map(m => {
               const status = calculateMemberStatus(m);
               const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.PENDING;
-              const duesVal = m.outstanding_dues > 0 ? m.outstanding_dues : (m.plan_amount || 1100);
+              const duesVal = getMemberDues(m);
               const tplKey = status === "OVERDUE" ? "overdue" : "reminder";
               const waMsg = formatWhatsAppMessage(tplKey, {
                 student_name: m.full_name || "Student",

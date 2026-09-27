@@ -781,7 +781,7 @@ export default function MembersDirectoryPage() {
               const defaultFee = isHalf ? 600 : 1100;
               const lockerAdd = m.has_locker ? 50 : 0;
               const planFee = (m.plan_amount || defaultFee) + lockerAdd;
-              const displayDues = (m.outstanding_dues > 0) ? m.outstanding_dues : (!memHasPayments ? planFee : 0);
+              const displayDues = (m.outstanding_dues > 0) ? m.outstanding_dues : (status === "OVERDUE" || status === "DUE_SOON" ? planFee : 0);
 
               return (
                 <div
@@ -866,8 +866,8 @@ export default function MembersDirectoryPage() {
                     const defaultFee = isHalf ? 600 : 1100;
                     const lockerAdd = m.has_locker ? 50 : 0;
                     const planFee = (m.plan_amount || defaultFee) + lockerAdd;
-                    const displayDues = (m.outstanding_dues > 0) ? m.outstanding_dues : (!memHasPayments ? planFee : 0);
-                    const hasValidSub = memHasPayments && m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970");
+                    const displayDues = (m.outstanding_dues > 0) ? m.outstanding_dues : (status === "OVERDUE" || status === "DUE_SOON" ? planFee : 0);
+                    const hasValidSub = m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970");
 
                     return (
                       <tr
@@ -1013,16 +1013,17 @@ export default function MembersDirectoryPage() {
                   {(() => {
                     const dates = getMemberSubscriptionDates(selectedMember, payments);
                     const memHasPayments = getMemberPayments(selectedMember).length > 0;
+                    const memberStatus = calculateMemberStatus(selectedMember, payments);
                     const isHalf = selectedMember.shift === 'Morning' || selectedMember.shift === 'Evening';
                     const defaultFee = isHalf ? 600 : 1100;
                     const lockerAdd = selectedMember.has_locker ? 50 : 0;
                     const planFee = (selectedMember.plan_amount || defaultFee) + lockerAdd;
                     const effectiveDues = (selectedMember.outstanding_dues > 0)
                       ? selectedMember.outstanding_dues
-                      : (!memHasPayments ? planFee : 0);
+                      : (memberStatus === "OVERDUE" || memberStatus === "DUE_SOON" ? planFee : 0);
 
                     let dynDuration = "Not Set (Unpaid)";
-                    if (memHasPayments && dates.subStart !== "--" && dates.subExpiry !== "--") {
+                    if (dates.subStart !== "--" && dates.subExpiry !== "--") {
                       const d1 = new Date(dates.subStart);
                       const d2 = new Date(dates.subExpiry);
                       if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
@@ -1039,7 +1040,7 @@ export default function MembersDirectoryPage() {
                       <>
                         <div><span className="text-slate-400 font-medium block">Initial Admission Date:</span> <p className="font-mono font-bold text-slate-700">{dates.initialAdmissionDate}</p></div>
                         <div><span className="text-slate-400 font-medium block">Subscription Start Date:</span> <p className="font-mono font-bold text-indigo-600">{dates.subStart}</p></div>
-                        <div><span className="text-slate-400 font-medium block">Subscription Expiry Date:</span> <p className="font-mono font-bold text-emerald-600">{memHasPayments && dates.subExpiry !== "--" ? dates.subExpiry : "Not Set"}</p></div>
+                        <div><span className="text-slate-400 font-medium block">Subscription Expiry Date:</span> <p className="font-mono font-bold text-emerald-600">{dates.subExpiry !== "--" ? dates.subExpiry : "Not Set"}</p></div>
                         <div><span className="text-slate-400 font-medium block">Duration:</span> <p className="font-mono font-bold text-slate-700">{dynDuration}</p></div>
                         <div><span className="text-slate-400 font-medium block">Outstanding Dues:</span> <p className="font-mono font-bold text-amber-600">₹{effectiveDues}</p></div>
                         {effectiveDues > 0 && (
