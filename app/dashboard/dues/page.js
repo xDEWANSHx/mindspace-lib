@@ -46,9 +46,12 @@ export default function DuesTrackerPage() {
 
   const getMemberFee = (m) => {
     const isHalf = m.shift === 'Morning' || m.shift === 'Evening';
-    const defaultFee = isHalf ? 600 : 1100;
-    const lockerAdd = m.has_locker ? 50 : 0;
-    return (m.plan_amount || defaultFee) + lockerAdd;
+    const baseFee = isHalf ? 600 : 1100;
+    const lockerFee = m.has_locker ? 50 : 0;
+    if (m.plan_amount && m.plan_amount !== 1100 && m.plan_amount !== 600 && m.plan_amount !== 1150 && m.plan_amount !== 650 && m.plan_amount !== 1200) {
+      return parseFloat(m.plan_amount);
+    }
+    return baseFee + lockerFee;
   };
 
   const getMemberDues = (m) => {

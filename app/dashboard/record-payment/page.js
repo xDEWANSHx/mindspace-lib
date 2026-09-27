@@ -673,9 +673,11 @@ function RecordPaymentContent() {
     const hasAnyPayment = memPayments.length > 0;
 
     const isHalfDay = m.shift === 'Morning' || m.shift === 'Evening';
-    const defaultFee = isHalfDay ? 600 : 1100;
-    const lockerAdd = m.has_locker ? 50 : 0;
-    const planFee = (m.plan_amount || defaultFee) + lockerAdd;
+    const baseFee = isHalfDay ? 600 : 1100;
+    const lockerFee = m.has_locker ? 50 : 0;
+    const planFee = (m.plan_amount && m.plan_amount !== 1100 && m.plan_amount !== 600 && m.plan_amount !== 1150 && m.plan_amount !== 650 && m.plan_amount !== 1200)
+      ? parseFloat(m.plan_amount)
+      : baseFee + lockerFee;
     const effectiveDues = (m.outstanding_dues > 0) ? m.outstanding_dues : (!hasAnyPayment ? planFee : 0);
 
     const dueDateStr = m.due_date || m.dues_due_date;

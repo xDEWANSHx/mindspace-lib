@@ -778,9 +778,11 @@ export default function MembersDirectoryPage() {
                 (p.member_name && m.full_name && p.member_name.trim().toLowerCase() === m.full_name.trim().toLowerCase())
               );
               const isHalf = m.shift === 'Morning' || m.shift === 'Evening';
-              const defaultFee = isHalf ? 600 : 1100;
-              const lockerAdd = m.has_locker ? 50 : 0;
-              const planFee = (m.plan_amount || defaultFee) + lockerAdd;
+              const baseFee = isHalf ? 600 : 1100;
+              const lockerFee = m.has_locker ? 50 : 0;
+              const planFee = (m.plan_amount && m.plan_amount !== 1100 && m.plan_amount !== 600 && m.plan_amount !== 1150 && m.plan_amount !== 650 && m.plan_amount !== 1200)
+                ? parseFloat(m.plan_amount)
+                : baseFee + lockerFee;
               const displayDues = (m.outstanding_dues > 0) ? m.outstanding_dues : (status === "OVERDUE" || status === "DUE_SOON" ? planFee : 0);
 
               return (
@@ -863,9 +865,11 @@ export default function MembersDirectoryPage() {
                       (p.member_name && m.full_name && p.member_name.trim().toLowerCase() === m.full_name.trim().toLowerCase())
                     );
                     const isHalf = m.shift === 'Morning' || m.shift === 'Evening';
-                    const defaultFee = isHalf ? 600 : 1100;
-                    const lockerAdd = m.has_locker ? 50 : 0;
-                    const planFee = (m.plan_amount || defaultFee) + lockerAdd;
+                    const baseFee = isHalf ? 600 : 1100;
+                    const lockerFee = m.has_locker ? 50 : 0;
+                    const planFee = (m.plan_amount && m.plan_amount !== 1100 && m.plan_amount !== 600 && m.plan_amount !== 1150 && m.plan_amount !== 650 && m.plan_amount !== 1200)
+                      ? parseFloat(m.plan_amount)
+                      : baseFee + lockerFee;
                     const displayDues = (m.outstanding_dues > 0) ? m.outstanding_dues : (status === "OVERDUE" || status === "DUE_SOON" ? planFee : 0);
                     const hasValidSub = m.subscription_end_date && !String(m.subscription_end_date).startsWith("1970");
 
@@ -1015,9 +1019,11 @@ export default function MembersDirectoryPage() {
                     const memHasPayments = getMemberPayments(selectedMember).length > 0;
                     const memberStatus = calculateMemberStatus(selectedMember, payments);
                     const isHalf = selectedMember.shift === 'Morning' || selectedMember.shift === 'Evening';
-                    const defaultFee = isHalf ? 600 : 1100;
-                    const lockerAdd = selectedMember.has_locker ? 50 : 0;
-                    const planFee = (selectedMember.plan_amount || defaultFee) + lockerAdd;
+                    const baseFee = isHalf ? 600 : 1100;
+                    const lockerFee = selectedMember.has_locker ? 50 : 0;
+                    const planFee = (selectedMember.plan_amount && selectedMember.plan_amount !== 1100 && selectedMember.plan_amount !== 600 && selectedMember.plan_amount !== 1150 && selectedMember.plan_amount !== 650 && selectedMember.plan_amount !== 1200)
+                      ? parseFloat(selectedMember.plan_amount)
+                      : baseFee + lockerFee;
                     const effectiveDues = (selectedMember.outstanding_dues > 0)
                       ? selectedMember.outstanding_dues
                       : (memberStatus === "OVERDUE" || memberStatus === "DUE_SOON" ? planFee : 0);
