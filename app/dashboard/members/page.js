@@ -482,10 +482,17 @@ export default function MembersDirectoryPage() {
       ? String(m.subscription_end_date).substring(0, 10)
       : todayStr;
     const endStr = addDaysToDate(startStr, 30);
+    const isHalf = m.shift === 'Morning' || m.shift === 'Evening';
+    const baseFee = isHalf ? 600 : 1100;
+    const lockerFee = m.has_locker ? 50 : 0;
+    const defaultRenewAmt = (m.plan_amount && m.plan_amount !== 1100 && m.plan_amount !== 600 && m.plan_amount !== 1150 && m.plan_amount !== 650 && m.plan_amount !== 1200)
+      ? parseFloat(m.plan_amount)
+      : (baseFee + lockerFee);
+
     setRenewStartDate(startStr);
     setRenewEndDate(endStr);
     setRenewDays(30);
-    setRenewAmount(m.plan_amount || 1100);
+    setRenewAmount(defaultRenewAmt);
     setRenewMode("UPI");
     setRenewModalOpen(true);
   };
@@ -502,6 +509,7 @@ export default function MembersDirectoryPage() {
       payment_mode: renewMode,
       start_date: renewStartDate,
       end_date: renewEndDate,
+      has_locker: selectedMember.has_locker,
       notes: `Full Subscription Renewal (${renewDays} days)`,
       is_renewal: true,
       extend_days: parseInt(renewDays || 30)

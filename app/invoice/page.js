@@ -152,7 +152,8 @@ function InvoicePrintContent() {
   const studentName = (member?.full_name || payment?.member_name || "STUDENT").toUpperCase();
   const libraryId = member?.permanent_id || member?.student_no || "MSB154";
   const mobileNo = member?.mobile || payment?.mobile || "";
-  const shiftName = member?.shift || payment?.shift || "Full Day";
+  const noteShift = payment?.notes?.match(/\((Morning|Evening|Full Day)\)/i)?.[1];
+  const shiftName = noteShift || payment?.shift || member?.shift || "Full Day";
   const seatNo = member?.seat_no || "Unassigned";
 
   // Joining Date: Member's initial lifetime admission date (from Student Directory)
@@ -202,41 +203,77 @@ function InvoicePrintContent() {
     }
   }
 
-  // Locker Details for Invoice: prioritize Student Directory (member.has_locker)
-  const hasLocker = member
-    ? !!member.has_locker
-    : (payment?.has_locker !== undefined && payment?.has_locker !== null
-        ? !!payment.has_locker
-        : !!(payment?.notes && payment.notes.toLowerCase().includes("locker")));
-  const lockerNo = member?.locker_no || payment?.locker_no || "Standard Locker";
-  const lockerFee = hasLocker ? 50 : 0;
+  // Locker Details for Invoice: prioritize explicit payment snapshot, else member's profile
+  let hasLocker = false;
+  if (payment?.has_locker !== undefined && payment?.has_locker !== null) {
+    hasLocker = !!payment.has_locker;
+  } else if (payment?.notes && payment.notes.toLowerCase().includes("locker facility discontinued")) {
+    hasLocker = false;
+  } else if (payment?.notes && payment.notes.toLowerCase().includes("locker")) {
+    hasLocker = true;
+  } else if (payment?.notes && (payment.notes.toLowerCase().includes("july") || payment.notes.toLowerCase().includes("express july")) && paidAmount <= 600) {
+    hasLocker = false;
+  } else if (member) {
+    hasLocker = !!member.has_locker;
+  }
 
-  // Dynamic Duration Text (e.g., "15 Days", "3 Days", "1 Month", etc.)
+  const lockerNo = member?.locker_no || payment?.locker_no || "Standard Locker";
+
+  // Dynamic Duration Text (e.g., "15 Days", "1 Month", "2 Months", etc.)
   let durationText = "1 Month";
-  let termText = "1 month(s)";
+  let termText = "1 month";
   let is15Days = false;
+  let monthsCount = 1;
 
   if (payment?.notes) {
-    const matchDays = payment.notes.match(/(\d+)\s*days/i);
-    if (matchDays && matchDays[1]) {
-      const dCount = parseInt(matchDays[1]);
-      if (dCount === 30 || dCount === 31) {
-        durationText = "1 Month";
-        termText = "1 month";
-      } else if (dCount === 15) {
+    const matchMonths = payment.notes.match(/(\d+)\s*Months?/i);
+    if (matchMonths && matchMonths[1]) {
+      const mCount = parseInt(matchMonths[1]);
+      monthsCount = mCount;
+      durationText = mCount === 1 ? "1 Month" : `${mCount} Months`;
+      termText = mCount === 1 ? "1 month" : `${mCount} months`;
+    } else {
+      const matchDays = payment.notes.match(/(\d+)\s*days/i);
+      if (matchDays && matchDays[1]) {
+        const dCount = parseInt(matchDays[1]);
+        if (dCount === 30 || dCount === 31) {
+          durationText = "1 Month";
+          termText = "1 month";
+          monthsCount = 1;
+        } else if (dCount === 15) {
+          durationText = "15 Days";
+          termText = "15 days";
+          is15Days = true;
+          monthsCount = 0.5;
+        } else if (dCount === 60) {
+          durationText = "2 Months";
+          termText = "2 months";
+          monthsCount = 2;
+        } else if (dCount === 90) {
+          durationText = "3 Months";
+          termText = "3 months";
+          monthsCount = 3;
+        } else if (dCount === 180) {
+          durationText = "6 Months";
+          termText = "6 months";
+          monthsCount = 6;
+        } else if (dCount === 365) {
+          durationText = "12 Months";
+          termText = "12 months";
+          monthsCount = 12;
+        } else {
+          durationText = `${dCount} Days`;
+          termText = `${dCount} day(s)`;
+        }
+      } else if (payment.notes.toLowerCase().includes("15 days") || payment.notes.toLowerCase().includes("15d")) {
         durationText = "15 Days";
         termText = "15 days";
         is15Days = true;
-      } else {
-        durationText = `${dCount} Days`;
-        termText = `${dCount} day(s)`;
+        monthsCount = 0.5;
       }
-    } else if (payment.notes.toLowerCase().includes("15 days") || payment.notes.toLowerCase().includes("15d")) {
-      durationText = "15 Days";
-      termText = "15 days";
-      is15Days = true;
     }
   }
+
   if (durationText === "1 Month" && rawSubStart && rawEndDate) {
     const dStart = new Date(rawSubStart);
     const dEnd = new Date(rawEndDate);
@@ -246,19 +283,28 @@ function InvoicePrintContent() {
         if (diffDays >= 28 && diffDays <= 31) {
           durationText = "1 Month";
           termText = "1 month";
+          monthsCount = 1;
         } else if (diffDays === 15) {
           durationText = "15 Days";
           termText = "15 days";
           is15Days = true;
+          monthsCount = 0.5;
+        } else if (diffDays >= 55 && diffDays <= 65) {
+          durationText = "2 Months";
+          termText = "2 months";
+          monthsCount = 2;
         } else if (diffDays >= 85 && diffDays <= 95) {
           durationText = "3 Months";
           termText = "3 months";
+          monthsCount = 3;
         } else if (diffDays >= 175 && diffDays <= 185) {
           durationText = "6 Months";
           termText = "6 months";
+          monthsCount = 6;
         } else if (diffDays >= 360 && diffDays <= 370) {
           durationText = "12 Months";
           termText = "12 months";
+          monthsCount = 12;
         } else {
           durationText = `${diffDays} Days`;
           termText = `${diffDays} day(s)`;
@@ -267,35 +313,24 @@ function InvoicePrintContent() {
     }
   }
 
-  // Determine full Base Plan amount for the student's subscription cycle
+  const lockerFee = hasLocker ? (is15Days ? 50 : 50 * (monthsCount || 1)) : 0;
+
+  // Determine full Base Desk Plan amount for the student's subscription cycle
   const isHalfDay = shiftName === "Morning" || shiftName === "Evening";
-  let planAmount = 0;
+  const standardMonthlyRate = isHalfDay ? 600 : 1100;
+  const standard15DayRate = isHalfDay ? 400 : 600;
 
-  if (is15Days) {
-    planAmount = (isHalfDay ? 400 : 600) + lockerFee;
-  } else if (payment?.notes) {
-    const matchOf = payment.notes.match(/Paid\s*₹?\s*(\d+(?:\.\d+)?)\s*of\s*₹?\s*(\d+(?:\.\d+)?)/i);
-    if (matchOf && matchOf[2]) {
-      planAmount = parseFloat(matchOf[2]);
-    }
+  let seatPlanAmount = is15Days ? standard15DayRate : (standardMonthlyRate * (monthsCount || 1));
+
+  if (payment?.notes) {
     const matchBase = payment.notes.match(/Base\s*Plan:\s*₹?\s*(\d+(?:\.\d+)?)/i);
-    if (!planAmount && matchBase && matchBase[1]) {
-      planAmount = parseFloat(matchBase[1]);
-    }
-    const matchTotalPlan = payment.notes.match(/Total\s*Plan:\s*₹?\s*(\d+(?:\.\d+)?)/i)
-      || payment.notes.match(/Plan\s*Fee:\s*₹?\s*(\d+(?:\.\d+)?)/i);
-    if (!planAmount && matchTotalPlan && matchTotalPlan[1]) {
-      planAmount = parseFloat(matchTotalPlan[1]);
+    if (matchBase && matchBase[1]) {
+      seatPlanAmount = parseFloat(matchBase[1]);
     }
   }
 
-  if (!planAmount && member?.plan_amount && parseFloat(member.plan_amount) > 0) {
-    planAmount = parseFloat(member.plan_amount);
-  }
-
-  if (!planAmount) {
-    planAmount = (isHalfDay ? 600 : 1100) + lockerFee;
-  }
+  // Total Subscription Plan Fee
+  const planAmount = seatPlanAmount + lockerFee;
 
   // Scheme detection
   const isNotesPayLater = payment?.payment_mode === "Deferred" || (payment?.notes && /pay\s*later|deferred/i.test(payment.notes));
@@ -336,13 +371,14 @@ function InvoicePrintContent() {
 
   // Calculate previously paid in this specific subscription cycle
   const netPayable = Math.max(0, planAmount - invoiceDiscount);
-  const previouslyPaidInCycle = Math.max(0, netPayable - paidAmount - remainingDuesAtReceipt);
+  let previouslyPaidInCycle = Math.max(0, netPayable - paidAmount - remainingDuesAtReceipt);
+  if (remainingDuesAtReceipt === 0 && paidAmount >= netPayable) {
+    previouslyPaidInCycle = 0;
+  }
 
   const isReceiptFullySettled = (remainingDuesAtReceipt === 0);
   const isPayLater = isNotesPayLater || (paidAmount === 0 && remainingDuesAtReceipt > 0);
   const isPartial = !isPayLater && remainingDuesAtReceipt > 0;
-
-  const seatPlanAmount = Math.max(0, planAmount - lockerFee);
 
   // Promised Payment Due Date (if present)
   const rawPromisedDate = member?.due_date || member?.dues_due_date || payment?.dues_due_date;

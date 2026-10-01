@@ -152,19 +152,21 @@ function RecordPaymentContent() {
     const isHalfDay = selectedMemberObj?.shift === "Morning" || selectedMemberObj?.shift === "Evening";
     
     // Exact standard shift rates: Full Day (1100 / 600) | Half Day (600 / 400)
-    const defaultShiftRate = isHalfDay ? 600 : 1100;
-    const baseMonthlyRate = (selectedMemberObj?.plan_amount && selectedMemberObj.plan_amount !== 1100 && selectedMemberObj.plan_amount !== 600)
-      ? selectedMemberObj.plan_amount
-      : defaultShiftRate;
-    const monthlyRate = includeLocker ? (baseMonthlyRate + (selectedMemberObj?.has_locker ? 0 : fee)) : baseMonthlyRate;
+    const baseShiftMonthly = (selectedMemberObj?.plan_amount && selectedMemberObj.plan_amount !== 1100 && selectedMemberObj.plan_amount !== 600 && selectedMemberObj.plan_amount !== 1150 && selectedMemberObj.plan_amount !== 650 && selectedMemberObj.plan_amount !== 1200)
+      ? (selectedMemberObj.has_locker ? Math.max(0, selectedMemberObj.plan_amount - 50) : selectedMemberObj.plan_amount)
+      : (isHalfDay ? 600 : 1100);
+
+    const monthlyRate = baseShiftMonthly + (includeLocker ? fee : 0);
 
     const base15DayRate = isHalfDay ? 400 : 600;
-    const fifteenDayRate = includeLocker ? (base15DayRate + fee) : base15DayRate;
+    const fifteenDayRate = base15DayRate + (includeLocker ? fee : 0);
 
     if (durationTab === "15D") {
       setPlanFee(fifteenDayRate);
     } else if (durationTab === "1M") {
       setPlanFee(monthlyRate);
+    } else if (durationTab === "2M") {
+      setPlanFee(monthlyRate * 2);
     } else if (durationTab === "3M") {
       setPlanFee(monthlyRate * 3);
     } else if (durationTab === "6M") {
@@ -268,8 +270,11 @@ function RecordPaymentContent() {
       setOverrideExpiryDate("");
 
       const isHalf = selectedMemberObj.shift === "Morning" || selectedMemberObj.shift === "Evening";
-      const defaultRate = isHalf ? 600 : 1100;
-      const memPlanAmt = (selectedMemberObj.plan_amount !== undefined && selectedMemberObj.plan_amount !== null && !isNaN(parseFloat(selectedMemberObj.plan_amount))) ? parseFloat(selectedMemberObj.plan_amount) : defaultRate;
+      const baseFee = isHalf ? 600 : 1100;
+      const lockerFeeVal = selectedMemberObj.has_locker ? 50 : 0;
+      const memPlanAmt = (selectedMemberObj.plan_amount !== undefined && selectedMemberObj.plan_amount !== null && !isNaN(parseFloat(selectedMemberObj.plan_amount)) && selectedMemberObj.plan_amount !== 1100 && selectedMemberObj.plan_amount !== 600 && selectedMemberObj.plan_amount !== 1150 && selectedMemberObj.plan_amount !== 650 && selectedMemberObj.plan_amount !== 1200)
+        ? parseFloat(selectedMemberObj.plan_amount)
+        : (baseFee + lockerFeeVal);
 
       if (selectedMemberObj.outstanding_dues > 0) {
         setPaymentType("COLLECT_DUES");
@@ -285,7 +290,7 @@ function RecordPaymentContent() {
         setOverrideExpiryDate("");
       }
     }
-  }, [selectedMemberId, selectedMemberObj?.outstanding_dues, selectedMemberObj?.subscription_end_date, selectedMemberObj?.plan_amount, selectedMemberObj?.shift, selectedMemberObj?.payment_status]);
+  }, [selectedMemberId, selectedMemberObj?.outstanding_dues, selectedMemberObj?.subscription_end_date, selectedMemberObj?.plan_amount, selectedMemberObj?.shift, selectedMemberObj?.payment_status, selectedMemberObj?.has_locker]);
 
   // Adjust joining date when switching paymentType
   useEffect(() => {
@@ -421,7 +426,20 @@ function RecordPaymentContent() {
     let defaultNote = "";
     let isRenewalAction = false;
 
-    const planDurationLabel = durationTab === "15D" ? "15 Days" : (durationTab === "CUSTOM" ? `${extendDays} Days` : `${extendDays} days`);
+    const planDurationLabel = durationTab === "15D"
+      ? "15 Days"
+      : durationTab === "1M"
+      ? "1 Month"
+      : durationTab === "2M"
+      ? "2 Months"
+      : durationTab === "3M"
+      ? "3 Months"
+      : durationTab === "6M"
+      ? "6 Months"
+      : durationTab === "12M"
+      ? "12 Months"
+      : (durationTab === "CUSTOM" ? `${extendDays} Days` : `${extendDays} days`);
+
     if (paymentType === "FULL") {
       defaultNote = `Full Subscription Payment (${planDurationLabel}, Paid ₹${parsedPaidToday} of ₹${effectivePayable}, ₹0 Remaining Dues)`;
       if (parsedDiscount > 0) defaultNote += ` [Discount Given: ₹${parsedDiscount}]`;
@@ -435,7 +453,7 @@ function RecordPaymentContent() {
       if (parsedDiscount > 0) defaultNote += ` [Discount Given: ₹${parsedDiscount}]`;
       isRenewalAction = true;
     } else if (paymentType === "COLLECT_DUES") {
-      if (durationTab === "15D" || durationTab === "3M" || durationTab === "6M" || durationTab === "12M" || durationTab === "CUSTOM") {
+      if (durationTab === "15D" || durationTab === "2M" || durationTab === "3M" || durationTab === "6M" || durationTab === "12M" || durationTab === "CUSTOM") {
         defaultNote = `Subscription Payment (${planDurationLabel}, Paid ₹${parsedPaidToday} of ₹${effectivePayable}, ₹${calculatedNewDues} Remaining Dues)`;
         isRenewalAction = true;
       } else {
@@ -1070,7 +1088,16 @@ function RecordPaymentContent() {
                     <span>Plan Duration & Custom Pricing</span>
                   </span>
                   <div className="flex items-center gap-2 font-mono text-xs">
-                    <span className="text-slate-500 font-medium">Student Rate: ₹{selectedMemberObj?.plan_amount || 1100}/mo</span>
+                    <span className="text-slate-500 font-medium">
+                      Student Rate: ₹{(() => {
+                        const isH = selectedMemberObj?.shift === "Morning" || selectedMemberObj?.shift === "Evening";
+                        const bF = isH ? 600 : 1100;
+                        const lF = selectedMemberObj?.has_locker ? 50 : 0;
+                        return (selectedMemberObj?.plan_amount && selectedMemberObj.plan_amount !== 1100 && selectedMemberObj.plan_amount !== 600 && selectedMemberObj.plan_amount !== 1150 && selectedMemberObj.plan_amount !== 650 && selectedMemberObj.plan_amount !== 1200)
+                          ? selectedMemberObj.plan_amount
+                          : (bF + lF);
+                      })()}/mo
+                    </span>
                     <span>•</span>
                     <span className="font-black text-slate-900">Base Plan: ₹{planFee}</span>
                   </div>
@@ -1153,10 +1180,11 @@ function RecordPaymentContent() {
                         : `${extendDays} Days`}
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-7 gap-2">
                     {[
                       { id: "15D", label: "15 Days", days: 15 },
                       { id: "1M", label: "1M", days: 30 },
+                      { id: "2M", label: "2M", days: 60 },
                       { id: "3M", label: "3M", days: 90 },
                       { id: "6M", label: "6M", days: 180 },
                       { id: "12M", label: "12M", days: 365 },
