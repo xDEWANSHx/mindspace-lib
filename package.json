@@ -6,7 +6,7 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint --no-error-on-unmatched-pattern ."
   },
   "dependencies": {
     "@fontsource/bitcount-single-ink": "^5.2.1",
