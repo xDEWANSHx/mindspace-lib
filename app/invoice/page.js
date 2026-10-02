@@ -482,10 +482,10 @@ function InvoicePrintContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0F172A] text-slate-900 font-sans p-4 md:p-10 flex flex-col items-center selection:bg-slate-900 selection:text-white relative">
+    <div className="min-h-screen bg-[#0F172A] text-slate-900 font-sans p-2.5 sm:p-6 md:p-10 flex flex-col items-center selection:bg-slate-900 selection:text-white relative overflow-x-hidden">
       {/* Floating Copy Toast Notification */}
       {copyToast && (
-        <div className="fixed top-5 z-50 bg-emerald-600 text-white font-extrabold text-xs px-6 py-3.5 rounded-2xl shadow-2xl border border-emerald-400 animate-bounce flex items-center gap-2">
+        <div className="fixed top-5 z-50 bg-emerald-600 text-white font-extrabold text-xs px-5 py-3 rounded-2xl shadow-2xl border border-emerald-400 animate-bounce flex items-center gap-2 max-w-[90vw] text-center">
           <span>{copyToast}</span>
         </div>
       )}
@@ -527,20 +527,20 @@ function InvoicePrintContent() {
       `}</style>
 
       {/* 1. Top Action Toolbar (Hidden during Print) */}
-      <div className="w-full max-w-[840px] mb-6 flex flex-col sm:flex-row items-center justify-between gap-4 print-hidden">
+      <div className="w-full max-w-[840px] mb-4 sm:mb-6 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 print-hidden">
         <Link
           href="/dashboard/invoices"
-          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-white transition-colors"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-white transition-colors self-start sm:self-auto"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Invoices Ledger</span>
         </Link>
 
         {/* Action Buttons: Print, Download, Share, Copy & Send via WhatsApp Web */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <button
             onClick={() => window.print()}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-lg border border-slate-700 transition-all cursor-pointer"
+            className="inline-flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-lg border border-slate-700 transition-all cursor-pointer"
           >
             <Printer className="w-4 h-4 text-cyan-400" />
             <span>Print</span>
@@ -548,7 +548,7 @@ function InvoicePrintContent() {
 
           <button
             onClick={() => window.print()}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#4F46E5] hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg transition-all cursor-pointer"
+            className="inline-flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-2 bg-[#4F46E5] hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg transition-all cursor-pointer"
           >
             <Download className="w-4 h-4" />
             <span>PDF</span>
@@ -556,7 +556,7 @@ function InvoicePrintContent() {
 
           <button
             onClick={handleWhatsAppShare}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#10B981] hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg transition-all cursor-pointer"
+            className="inline-flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-2 bg-[#10B981] hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg transition-all cursor-pointer"
           >
             <Share2 className="w-4 h-4" />
             <span>Share Link</span>
@@ -564,7 +564,7 @@ function InvoicePrintContent() {
 
           <button
             onClick={handleCopyInvoiceText}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-black rounded-xl shadow-lg shadow-teal-600/30 transition-all cursor-pointer ring-2 ring-teal-400/50"
+            className="inline-flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-black rounded-xl shadow-lg shadow-teal-600/30 transition-all cursor-pointer ring-2 ring-teal-400/50"
             title="Copies full Receipt details & online link directly to Clipboard"
           >
             {isCopied ? <Check className="w-4 h-4 text-emerald-200 animate-bounce" /> : <Copy className="w-4 h-4 text-teal-200" />}
@@ -574,26 +574,26 @@ function InvoicePrintContent() {
       </div>
 
       {/* 2. Official A4 Size Fee Receipt Card */}
-      <div id="a4-invoice-printable" className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-[840px] p-8 sm:p-12 space-y-8 print:p-8 print:shadow-none print:w-full">
+      <div id="a4-invoice-printable" className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-[840px] p-4 sm:p-8 md:p-12 space-y-6 sm:space-y-8 print:p-8 print:shadow-none print:w-full overflow-hidden">
         
         {/* Header Section */}
-        <div className="flex flex-col sm:flex-row items-start justify-between gap-6 pb-6 border-b border-slate-200">
+        <div className="flex flex-col sm:flex-row items-start justify-between gap-4 sm:gap-6 pb-5 sm:pb-6 border-b border-slate-200">
           {/* Left Brand Details */}
-          <div className="space-y-2 max-w-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-slate-900 p-0.5 border border-slate-700 shrink-0 relative overflow-hidden">
+          <div className="space-y-1.5 sm:space-y-2 max-w-sm">
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-slate-900 p-0.5 border border-slate-700 shrink-0 relative overflow-hidden">
                 <Image src="/assets/logo.jpg" alt="MindSpace Logo" width={48} height={48} className="object-cover rounded-lg" />
               </div>
               <div>
-                <h1 className="text-xl font-black text-[#0F172A] tracking-tight">
+                <h1 className="text-lg sm:text-xl font-black text-[#0F172A] tracking-tight">
                   MINDSPACE LIBRARY
                 </h1>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">
+                <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-indigo-600">
                   AMBIKAPUR MAIN BRANCH
                 </p>
               </div>
             </div>
-            <p className="text-xs text-slate-500 font-medium leading-relaxed">
+            <p className="text-[11px] sm:text-xs text-slate-500 font-medium leading-relaxed">
               MG Road, Near Goyal Super Mart, Patpariya,<br />
               Ambikapur, Chhattisgarh — 497001<br />
               Phone: +91 79746 73138
@@ -601,21 +601,21 @@ function InvoicePrintContent() {
           </div>
 
           {/* Center Highlight Pill */}
-          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-6 py-4 text-center min-w-[200px] shadow-2xs">
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-600 block mb-1">
+          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-2.5 sm:px-6 sm:py-4 text-center w-full sm:w-auto sm:min-w-[180px] shadow-2xs">
+            <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-widest text-indigo-600 block mb-0.5 sm:mb-1">
               STUDENT / ALLOTMENT NO.
             </span>
-            <span className="text-xl font-black text-[#0F172A] font-mono tracking-tight">
+            <span className="text-lg sm:text-xl font-black text-[#0F172A] font-mono tracking-tight">
               {studentAllotmentNo}
             </span>
           </div>
 
           {/* Right Invoice Title & No */}
-          <div className="text-right space-y-2">
-            <h2 className="text-2xl font-black text-[#0F172A] tracking-wider uppercase">
+          <div className="w-full sm:w-auto sm:text-right space-y-2">
+            <h2 className="text-xl sm:text-2xl font-black text-[#0F172A] tracking-wider uppercase">
               FEE RECEIPT
             </h2>
-            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-xs space-y-1 inline-block text-left min-w-[160px]">
+            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 text-xs space-y-1 block text-left w-full sm:inline-block sm:min-w-[160px]">
               <div className="flex justify-between gap-4">
                 <span className="text-slate-400 font-semibold text-[10px] uppercase">RECEIPT NO</span>
                 <span className="font-bold font-mono text-slate-900">{receiptNo}</span>
@@ -649,68 +649,68 @@ function InvoicePrintContent() {
         </div>
 
         {/* Billed To & Subscription Details Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-xs">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8 text-xs">
           {/* Billed To */}
-          <div className="space-y-2">
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block mb-1">
+          <div className="space-y-1 sm:space-y-2">
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block mb-0.5 sm:mb-1">
               BILLED TO
             </span>
-            <p className="text-base font-bold text-[#0F172A] tracking-tight">{studentName}</p>
+            <p className="text-sm sm:text-base font-bold text-[#0F172A] tracking-tight">{studentName}</p>
             <p className="text-slate-600 font-medium">Library ID: <span className="font-bold text-slate-900 font-mono">{libraryId}</span></p>
             <p className="text-slate-600 font-medium">Phone: <span className="font-semibold text-slate-900">{mobileNo}</span></p>
           </div>
 
           {/* Subscription Details */}
-          <div className="space-y-2 md:text-right">
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block mb-1">
+          <div className="space-y-1.5 sm:space-y-2 md:text-right">
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block mb-0.5 sm:mb-1">
               SUBSCRIPTION DETAILS
             </span>
             <div className="space-y-1 font-medium text-slate-700">
-              <p>Shift: <span className="font-bold text-slate-900">{shiftName}</span></p>
-              <p>Seat No: <span className="font-bold text-indigo-700 font-mono text-sm">{seatNo}</span></p>
-              <p>Locker Facility: <span className={`font-bold font-mono ${hasLocker ? "text-purple-700 font-extrabold" : "text-slate-500"}`}>{hasLocker ? `Assigned (${lockerNo})` : 'No Locker Assigned'}</span></p>
-              <p>Initial Admission Date: <span className="font-bold text-slate-900 font-mono">{joiningDate}</span></p>
-              <p>Subscription Start Date: <span className="font-bold text-indigo-700 font-mono">{subscriptionStartDate}</span></p>
-              <p>Valid Till: <span className="font-bold text-slate-900 font-mono">{endDate}</span></p>
-              <p>Duration: <span className="font-bold text-slate-900 font-mono">{durationText}</span></p>
+              <p className="flex justify-between md:justify-end gap-2"><span>Shift:</span> <span className="font-bold text-slate-900">{shiftName}</span></p>
+              <p className="flex justify-between md:justify-end gap-2"><span>Seat No:</span> <span className="font-bold text-indigo-700 font-mono text-sm">{seatNo}</span></p>
+              <p className="flex justify-between md:justify-end gap-2"><span>Locker Facility:</span> <span className={`font-bold font-mono ${hasLocker ? "text-purple-700 font-extrabold" : "text-slate-500"}`}>{hasLocker ? `Assigned (${lockerNo})` : 'No Locker Assigned'}</span></p>
+              <p className="flex justify-between md:justify-end gap-2"><span>Initial Admission Date:</span> <span className="font-bold text-slate-900 font-mono">{joiningDate}</span></p>
+              <p className="flex justify-between md:justify-end gap-2"><span>Subscription Start Date:</span> <span className="font-bold text-indigo-700 font-mono">{subscriptionStartDate}</span></p>
+              <p className="flex justify-between md:justify-end gap-2"><span>Valid Till:</span> <span className="font-bold text-slate-900 font-mono">{endDate}</span></p>
+              <p className="flex justify-between md:justify-end gap-2"><span>Duration:</span> <span className="font-bold text-slate-900 font-mono">{durationText}</span></p>
             </div>
           </div>
         </div>
 
         {/* Item Breakdown Table */}
-        <div className="rounded-xl overflow-hidden border border-slate-200 shadow-2xs">
-          <table className="w-full text-left text-xs border-collapse">
+        <div className="rounded-xl overflow-x-auto border border-slate-200 shadow-2xs">
+          <table className="w-full text-left text-xs border-collapse min-w-[280px]">
             <thead>
-              <tr className="bg-[#0F172A] text-white uppercase text-[10px] tracking-wider">
-                <th className="py-3 px-5 font-bold">DESCRIPTION</th>
-                <th className="py-3 px-5 font-bold text-center">TERM</th>
-                <th className="py-3 px-5 font-bold text-right">AMOUNT</th>
+              <tr className="bg-[#0F172A] text-white uppercase text-[9px] sm:text-[10px] tracking-wider">
+                <th className="py-2.5 px-3 sm:py-3 sm:px-5 font-bold">DESCRIPTION</th>
+                <th className="py-2.5 px-2 sm:py-3 sm:px-5 font-bold text-center whitespace-nowrap">TERM</th>
+                <th className="py-2.5 px-3 sm:py-3 sm:px-5 font-bold text-right whitespace-nowrap">AMOUNT</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 text-slate-800">
               <tr className="bg-white">
-                <td className="py-4 px-5">
-                  <p className="font-bold text-slate-900 text-sm">Library Membership Desk Subscription ({shiftName})</p>
-                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                <td className="py-3 px-3 sm:py-4 sm:px-5 align-top">
+                  <p className="font-bold text-slate-900 text-xs sm:text-sm">Library Membership Desk Subscription ({shiftName})</p>
+                  <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">
                     High speed Wi-Fi, AC quiet study sanctuary access, reserved cabin desk workstation ({shiftName} shift).
                   </p>
                 </td>
-                <td className="py-4 px-5 text-center font-semibold font-mono text-slate-700">{termText}</td>
-                <td className="py-4 px-5 text-right font-bold font-mono text-slate-900 text-sm">₹{seatPlanAmount.toLocaleString()}.00</td>
+                <td className="py-3 px-2 sm:py-4 sm:px-5 text-center font-semibold font-mono text-slate-700 text-xs sm:text-sm whitespace-nowrap align-top">{termText}</td>
+                <td className="py-3 px-3 sm:py-4 sm:px-5 text-right font-bold font-mono text-slate-900 text-xs sm:text-sm whitespace-nowrap align-top">₹{seatPlanAmount.toLocaleString()}.00</td>
               </tr>
               {hasLocker && (
                 <tr className="bg-purple-50/40">
-                  <td className="py-3.5 px-5">
-                    <p className="font-bold text-purple-900 text-xs flex items-center gap-1.5">
+                  <td className="py-3 px-3 sm:py-3.5 sm:px-5 align-top">
+                    <div className="font-bold text-purple-900 text-xs flex flex-wrap items-center gap-1.5">
                       <span>Personal Locker Storage Access</span>
-                      <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 font-mono text-[10px]">{lockerNo}</span>
-                    </p>
-                    <p className="text-[10px] text-slate-500 font-medium">
+                      <span className="px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-800 font-mono text-[9px] sm:text-[10px]">{lockerNo}</span>
+                    </div>
+                    <p className="text-[9px] sm:text-[10px] text-slate-500 font-medium mt-0.5">
                       Dedicated secure personal storage locker facility allotment.
                     </p>
                   </td>
-                  <td className="py-3.5 px-5 text-center font-semibold font-mono text-slate-700">{termText}</td>
-                  <td className="py-3.5 px-5 text-right font-bold font-mono text-purple-700 text-xs">₹{lockerFee.toLocaleString()}.00</td>
+                  <td className="py-3 px-2 sm:py-3.5 sm:px-5 text-center font-semibold font-mono text-slate-700 text-xs sm:text-sm whitespace-nowrap align-top">{termText}</td>
+                  <td className="py-3 px-3 sm:py-3.5 sm:px-5 text-right font-bold font-mono text-purple-700 text-xs sm:text-sm whitespace-nowrap align-top">₹{lockerFee.toLocaleString()}.00</td>
                 </tr>
               )}
             </tbody>
@@ -718,21 +718,21 @@ function InvoicePrintContent() {
         </div>
 
         {/* Transaction Payment Timeline Box */}
-        <div className="space-y-2">
+        <div className="space-y-1.5 sm:space-y-2">
           <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block">
             TRANSACTION PAYMENT DETAILS
           </span>
-          <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 text-xs space-y-1.5">
-            <div className="flex items-center justify-between font-bold text-slate-900">
-              <span>Payment Mode: <strong className="text-indigo-700 font-mono">{payment.payment_mode || "Cash"}</strong></span>
-              <span className="font-mono text-sm font-black text-emerald-700">₹{paidAmount.toLocaleString()}.00 Collected</span>
+          <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 sm:p-4 text-xs space-y-1.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between font-bold text-slate-900 gap-1 sm:gap-4">
+              <span className="text-xs sm:text-sm">Payment Mode: <strong className="text-indigo-700 font-mono">{payment.payment_mode || "Cash"}</strong></span>
+              <span className="font-mono text-xs sm:text-sm font-black text-emerald-700">₹{paidAmount.toLocaleString()}.00 Collected</span>
             </div>
             {payment.payment_mode === "Split" && (
-              <p className="text-[11px] text-slate-600 font-mono font-semibold">
+              <p className="text-[10px] sm:text-[11px] text-slate-600 font-mono font-semibold">
                 Split Breakdown: Cash ₹{payment.cash_amount || 0} + Online ₹{payment.online_amount || 0}
               </p>
             )}
-            <p className="text-[11px] text-slate-600 font-medium">
+            <p className="text-[10px] sm:text-[11px] text-slate-600 font-medium leading-relaxed">
               {isPayLater
                 ? <>Subscription activated on <strong className="font-mono text-slate-800">{receiptDate}</strong> under <strong className="text-amber-700">Pay Later</strong> scheme — Start Date: {subscriptionStartDate}, Expiry: {endDate}. Total Base Plan: ₹{planAmount}. Full dues of ₹{remainingDuesAtReceipt} to be cleared by promised date.</>
                 : isReceiptFullySettled && previouslyPaidInCycle > 0
@@ -743,7 +743,7 @@ function InvoicePrintContent() {
               }
             </p>
             {payment.notes && (
-              <p className="text-[11px] text-slate-600 italic border-t border-slate-200/60 pt-1 mt-1">
+              <p className="text-[10px] sm:text-[11px] text-slate-600 italic border-t border-slate-200/60 pt-1 mt-1 break-words">
                 Note: {payment.notes}
               </p>
             )}
@@ -751,22 +751,22 @@ function InvoicePrintContent() {
         </div>
 
         {/* Settlement Badge & Summary Calculation */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start pt-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8 items-start pt-1 sm:pt-2">
           {/* Left Settlement & Promised Date Card */}
           <div className="space-y-3">
-            <div className={`p-5 rounded-2xl border flex items-center gap-4 ${
+            <div className={`p-4 sm:p-5 rounded-2xl border flex items-center gap-3 sm:gap-4 ${
               isReceiptFullySettled
                 ? "bg-emerald-50/80 border-emerald-200 text-emerald-900"
                 : "bg-amber-50/80 border-amber-200 text-amber-900"
             }`}>
-              <div className={`p-2.5 rounded-xl shrink-0 ${isReceiptFullySettled ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"}`}>
-                <ShieldCheck className="w-6 h-6" />
+              <div className={`p-2 sm:p-2.5 rounded-xl shrink-0 ${isReceiptFullySettled ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"}`}>
+                <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
               <div>
-                <p className="font-black text-sm tracking-wide uppercase">
+                <p className="font-black text-xs sm:text-sm tracking-wide uppercase">
                   {isReceiptFullySettled ? "FULLY SETTLED" : isPayLater ? "PAY LATER / DUES PENDING" : "PARTIAL / DUES PENDING"}
                 </p>
-                <p className="text-[11px] font-medium opacity-90 mt-0.5">
+                <p className="text-[10px] sm:text-[11px] font-medium opacity-90 mt-0.5">
                   {isReceiptFullySettled
                     ? "All dues for this subscription cycle have been fully cleared."
                     : `Outstanding Balance Dues Remaining: ₹${remainingDuesAtReceipt}`
@@ -777,29 +777,29 @@ function InvoicePrintContent() {
 
             {/* PROMISED DUE DATE CARD (If dues exist) */}
             {!isReceiptFullySettled && (
-              <div className={`p-4 rounded-2xl border space-y-1.5 ${
+              <div className={`p-3.5 sm:p-4 rounded-2xl border space-y-1.5 ${
                 isPromisedOverdue
                   ? "bg-rose-50 border-rose-300 text-rose-950"
                   : "bg-amber-50 border-amber-300 text-amber-950"
               }`}>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-black uppercase">
-                    <Calendar className="w-4 h-4 text-amber-600" />
-                    <span>PROMISED PAYMENT DUE DATE</span>
+                  <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-black uppercase">
+                    <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600" />
+                    <span>PROMISED DUE DATE</span>
                   </div>
-                  <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-md ${
+                  <span className={`text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-md ${
                     isPromisedOverdue ? "bg-rose-600 text-white" : "bg-amber-200 text-amber-900"
                   }`}>
                     {isPromisedOverdue ? "OVERDUE" : "PROMISED"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between pt-1">
-                  <span className="text-xs font-bold text-slate-600">Promised Dues Clearance Date:</span>
-                  <span className="font-mono font-black text-sm text-slate-900">
+                  <span className="text-[11px] sm:text-xs font-bold text-slate-600">Promised Clearance:</span>
+                  <span className="font-mono font-black text-xs sm:text-sm text-slate-900">
                     {promisedDateFormatted || "Not Set"}
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-500 italic">
+                <p className="text-[9px] sm:text-[10px] text-slate-500 italic">
                   * Staff-editable entry. Auto-marked Overdue if missed.
                 </p>
               </div>
@@ -807,7 +807,7 @@ function InvoicePrintContent() {
           </div>
 
           {/* Right Grand Total Calculation */}
-          <div className="space-y-2 text-xs font-medium text-slate-700">
+          <div className="space-y-1.5 sm:space-y-2 text-xs font-medium text-slate-700">
             <div className="flex justify-between py-1 border-b border-slate-100">
               <span>Base Plan Rate ({shiftName})</span>
               <span className="font-mono font-bold text-slate-900">₹{seatPlanAmount.toLocaleString()}.00</span>
@@ -849,15 +849,15 @@ function InvoicePrintContent() {
                 <span className="font-mono">₹0.00 (Fully Settled)</span>
               </div>
             )}
-            <div className="flex justify-between py-2 text-base font-black text-[#0F172A] border-t-2 border-slate-900 px-2">
-              <span className="uppercase tracking-wider">GRAND TOTAL (PLAN VALUE)</span>
+            <div className="flex justify-between py-2 text-sm sm:text-base font-black text-[#0F172A] border-t-2 border-slate-900 px-2">
+              <span className="uppercase tracking-wider">GRAND TOTAL</span>
               <span className="font-mono">₹{planAmount.toLocaleString()}.00</span>
             </div>
           </div>
         </div>
 
         {/* Footer Note */}
-        <div className="pt-6 border-t border-slate-200 text-center space-y-1 text-[11px] text-slate-500 font-medium">
+        <div className="pt-5 sm:pt-6 border-t border-slate-200 text-center space-y-1 text-[10px] sm:text-[11px] text-slate-500 font-medium">
           <p className="font-bold text-slate-800">Thank you for studying at MindSpace Library!</p>
           <p className="italic">This is an official computer-generated receipt requiring no physical signature.</p>
         </div>

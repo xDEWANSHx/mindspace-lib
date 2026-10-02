@@ -475,8 +475,10 @@ export default function NewAdmissionPage() {
           paid_amount: 0,
           payment_mode: 'Cash'
         });
-        // Also update personal details if edited
-        await updateMember(formData.existing_id, {
+
+        const isAlreadyPaid = newMem?.payment_status === 'PAID' && (parseFloat(newMem?.outstanding_dues || 0) <= 0);
+
+        const updatePayload = {
           full_name: formData.full_name,
           father_name: formData.father_name,
           mobile: formData.mobile,
@@ -485,11 +487,25 @@ export default function NewAdmissionPage() {
           address: formData.address,
           aadhar_no: formData.aadhar_no,
           targeting_exam: formData.targeting_exam,
-          has_locker: formData.has_locker,
-          outstanding_dues: finalAmount,
-          payment_status: 'PAY_LATER',
-          due_date: formData.due_date
-        });
+          has_locker: formData.has_locker
+        };
+
+        if (isAlreadyPaid) {
+          updatePayload.outstanding_dues = 0;
+          updatePayload.payment_status = 'PAID';
+          if (newMem.subscription_end_date) {
+            updatePayload.subscription_end_date = newMem.subscription_end_date;
+          }
+          if (newMem.joining_date) {
+            updatePayload.joining_date = newMem.joining_date;
+          }
+        } else {
+          updatePayload.outstanding_dues = finalAmount;
+          updatePayload.payment_status = 'PAY_LATER';
+          updatePayload.due_date = formData.due_date;
+        }
+
+        await updateMember(formData.existing_id, updatePayload);
       } else {
         const memberPayload = {
           permanent_id: liveNextId,
