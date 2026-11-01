@@ -44,9 +44,9 @@ VALUES (
       { "id": "img-6", "title": "Personal Storage", "subtitle": "Secure Lockers & Quiet Ambiance", "url": "/photos/IMG_20260603_203042678_HDR~2.jpg" }
     ],
     "adminUsername": "mindspace-01",
-    "adminPassword": "Harsh@44",
+    "adminPassword": "",
     "staffUsername": "staff-01",
-    "staffPassword": "Staff.01"
+    "staffPassword": ""
   }'::jsonb,
   now()
 )

@@ -3,12 +3,12 @@
 import { Suspense } from "react";
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { fetchPayments, fetchMembers, formatDate, addOneMonth } from "@/lib/adminService";
+import { formatDate, addOneMonth } from "@/lib/adminService";
 import { Printer, Download, Share2, ArrowLeft, ShieldCheck, Calendar, Clock, Copy, Check } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 
-import { supabase } from "@/lib/supabase";
+
 
 function InvoicePrintContent() {
   const router = useRouter();
@@ -16,103 +16,35 @@ function InvoicePrintContent() {
   const rawId = searchParams.get("id") || searchParams.get("invoice_id") || searchParams.get("invoiceId") || searchParams.get("invoice") || searchParams.get("receipt");
   const invoiceId = rawId ? String(rawId).trim() : null;
 
+  const token = searchParams.get('token') || '';
+  const [shareToken, setShareToken] = useState('');
+  const [loadError, setLoadError] = useState('');
   const [payment, setPayment] = useState(null);
   const [member, setMember] = useState(null);
-  const [memberPayments, setMemberPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [copyToast, setCopyToast] = useState("");
   const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
+    const controller = new AbortController();
     async function load() {
-      setLoading(true);
-      const [pList, mList] = await Promise.all([
-        fetchPayments("ALL"),
-        fetchMembers("ALL")
-      ]);
-
-      let foundPayment = null;
-
-      // 1. Try fuzzy matching in pre-fetched pList
-      if (invoiceId && pList.length > 0) {
-        const cleanQ = invoiceId.toLowerCase();
-        foundPayment = pList.find(p => {
-          const invId = p.invoice_id ? String(p.invoice_id).trim().toLowerCase() : "";
-          const pId = p.id ? String(p.id).trim().toLowerCase() : "";
-          return invId === cleanQ || pId === cleanQ || invId.includes(cleanQ) || cleanQ.includes(invId);
-        });
-      }
-
-      // 2. Direct Supabase query fallback if not matched in pList
-      if (invoiceId && !foundPayment) {
-        try {
-          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(invoiceId);
-          let dbMatch = null;
-          if (isUUID) {
-            const { data } = await supabase.from('payments').select('*').eq('id', invoiceId).limit(1);
-            dbMatch = data;
-          } else {
-            const { data } = await supabase.from('payments').select('*').ilike('invoice_id', `%${invoiceId}%`).limit(1);
-            dbMatch = data;
-          }
-          if (dbMatch && dbMatch.length > 0) {
-            foundPayment = dbMatch[0];
-          }
-        } catch (e) {
-          console.error("Supabase direct payment lookup error:", e);
-        }
-      }
-
-      // 3. Fallback to latest payment if no specific ID or no match
-      if (!foundPayment && pList.length > 0) {
-        foundPayment = pList[0];
-      }
-
-      if (foundPayment) {
-        setPayment(foundPayment);
-        let foundMem = mList.find(m => m.id === foundPayment.member_id);
-        if (!foundMem && foundPayment.member_name) {
-          const pName = foundPayment.member_name.trim().toLowerCase();
-          foundMem = mList.find(m => m.full_name && m.full_name.trim().toLowerCase() === pName);
-        }
-        if (!foundMem && (foundPayment.mobile || foundPayment.phone)) {
-          const pMob = String(foundPayment.mobile || foundPayment.phone).replace(/\D/g, '');
-          if (pMob) foundMem = mList.find(m => m.mobile && String(m.mobile).replace(/\D/g, '') === pMob);
-        }
-
-        // Direct DB member lookup fallback
-        if (!foundMem) {
-          try {
-            if (foundPayment.member_id) {
-              const { data: dbMem } = await supabase.from('members').select('*').eq('id', foundPayment.member_id).single();
-              if (dbMem) foundMem = dbMem;
-            }
-            if (!foundMem && foundPayment.member_name) {
-              const { data: dbMemList } = await supabase.from('members').select('*').ilike('full_name', `%${foundPayment.member_name.trim()}%`).limit(1);
-              if (dbMemList && dbMemList.length > 0) foundMem = dbMemList[0];
-            }
-          } catch (e) {}
-        }
-
-        setMember(foundMem || null);
-
-        const memPayments = (pList || []).filter(p =>
-          (foundPayment.member_id && p.member_id === foundPayment.member_id) ||
-          (foundMem?.id && p.member_id === foundMem.id) ||
-          (foundMem?.permanent_id && (p.member_id === foundMem.permanent_id || p.member_id === foundMem.student_no)) ||
-          (p.member_name && foundMem?.full_name && p.member_name.trim().toLowerCase() === foundMem.full_name.trim().toLowerCase()) ||
-          (p.member_name && foundPayment.member_name && p.member_name.trim().toLowerCase() === foundPayment.member_name.trim().toLowerCase())
-        );
-        setMemberPayments(memPayments);
-      }
-      setLoading(false);
+      setLoading(true); setPayment(null); setMember(null); setLoadError('');
+      try {
+        if (!invoiceId && !token) throw new Error('An exact invoice ID is required.');
+        const response = await fetch('/api/invoice?' + new URLSearchParams({ id: invoiceId || '', token }), { signal: controller.signal, cache: 'no-store' });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Invoice could not be loaded.');
+        setPayment(result.payment); setMember(result.member); setShareToken(result.shareToken);
+      } catch (error) { if (error.name !== 'AbortError') setLoadError(error.message); }
+      finally { if (!controller.signal.aborted) setLoading(false); }
     }
     load();
-  }, [invoiceId]);
+    return () => controller.abort();
+  }, [invoiceId, token]);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0F172A] text-slate-200 flex items-center justify-center p-4 font-sans">
+      <div suppressHydrationWarning className="min-h-screen bg-[#0F172A] text-slate-200 flex items-center justify-center p-4 font-sans">
         <div className="flex items-center gap-3 bg-slate-800/80 px-6 py-4 rounded-xl border border-slate-700 shadow-xl">
           <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-sm font-medium">Generating Official A4 Fee Receipt...</span>
@@ -123,10 +55,10 @@ function InvoicePrintContent() {
 
   if (!payment) {
     return (
-      <div className="min-h-screen bg-[#0F172A] text-slate-200 flex items-center justify-center p-4 font-sans">
+      <div suppressHydrationWarning className="min-h-screen bg-[#0F172A] text-slate-200 flex items-center justify-center p-4 font-sans">
         <div className="text-center space-y-4 max-w-md bg-slate-800/80 p-8 rounded-2xl border border-slate-700 shadow-xl">
           <p className="text-base font-semibold text-slate-300">Invoice Record Not Found</p>
-          <p className="text-xs text-slate-400">The requested invoice ID could not be loaded from database records.</p>
+          <p className="text-xs text-slate-400">{loadError || "The requested invoice could not be loaded."}</p>
           <Link
             href="/dashboard/invoices"
             className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition-colors"
@@ -140,7 +72,7 @@ function InvoicePrintContent() {
   }
 
   // Calculated variables for reference template matching
-  const receiptNo = payment.invoice_id || `REC-B-${Date.now().toString().slice(-5)}`;
+  const receiptNo = payment.invoice_id || payment.id || "N/A";
   
   // Formatted dates
   let rawPaidAt = payment.paid_at || payment.created_at || member?.joining_date;
@@ -148,9 +80,9 @@ function InvoicePrintContent() {
     ? String(rawPaidAt).substring(0, 10).split('-').reverse().join('/')
     : (member?.joining_date ? String(member.joining_date).substring(0, 10).split('-').reverse().join('/') : "N/A");
   
-  const studentAllotmentNo = member?.permanent_id || `#MS26B${Date.now().toString().slice(-2)}`;
+  const studentAllotmentNo = member?.permanent_id || "N/A";
   const studentName = (member?.full_name || payment?.member_name || "STUDENT").toUpperCase();
-  const libraryId = member?.permanent_id || member?.student_no || "MSB154";
+  const libraryId = member?.permanent_id || member?.student_no || "N/A";
   const mobileNo = member?.mobile || payment?.mobile || "";
   const noteShift = payment?.notes?.match(/\((Morning|Evening|Full Day)\)/i)?.[1];
   const shiftName = noteShift || payment?.shift || member?.shift || "Full Day";
@@ -264,6 +196,7 @@ function InvoicePrintContent() {
         } else {
           durationText = `${dCount} Days`;
           termText = `${dCount} day(s)`;
+          monthsCount = dCount / 30;
         }
       } else if (payment.notes.toLowerCase().includes("15 days") || payment.notes.toLowerCase().includes("15d")) {
         durationText = "15 Days";
@@ -308,6 +241,7 @@ function InvoicePrintContent() {
         } else {
           durationText = `${diffDays} Days`;
           termText = `${diffDays} day(s)`;
+          monthsCount = diffDays / 30;
         }
       }
     }
@@ -315,22 +249,45 @@ function InvoicePrintContent() {
 
   const lockerFee = hasLocker ? (is15Days ? 50 : 50 * (monthsCount || 1)) : 0;
 
-  // Determine full Base Desk Plan amount for the student's subscription cycle
+  // 1. Detect explicit plan total from payment notes (e.g. "Total ₹300", "Paid ₹300 of ₹300", "10 Days plan, ₹300 Total", "Base Plan: ₹300")
+  let explicitPlanTotal = null;
+  if (payment?.notes) {
+    const matchSettlementTotal = payment.notes.match(/(?:Total|Custom Plan Settlement|Plan Total|Total Plan)\s*(?:Fee|Amount)?\s*:?\s*₹?\s*(\d+(?:\.\d+)?)/i);
+    const matchOf = payment.notes.match(/Paid\s*₹?\s*\d+(?:\.\d+)?\s*of\s*₹?\s*(\d+(?:\.\d+)?)/i);
+    const matchPlanDeferred = payment.notes.match(/(\d+)\s*(?:Days?|Months?)\s*plan,\s*₹?\s*(\d+(?:\.\d+)?)\s*Total/i);
+    const matchBase = payment.notes.match(/Base\s*Plan\s*:?\s*₹?\s*(\d+(?:\.\d+)?)/i);
+
+    if (matchSettlementTotal && matchSettlementTotal[1]) {
+      explicitPlanTotal = parseFloat(matchSettlementTotal[1]);
+    } else if (matchOf && matchOf[1]) {
+      explicitPlanTotal = parseFloat(matchOf[1]);
+    } else if (matchPlanDeferred && matchPlanDeferred[2]) {
+      explicitPlanTotal = parseFloat(matchPlanDeferred[2]);
+    } else if (matchBase && matchBase[1]) {
+      explicitPlanTotal = parseFloat(matchBase[1]);
+    }
+  }
+
+  // 2. Determine Base Desk Plan amount
   const isHalfDay = shiftName === "Morning" || shiftName === "Evening";
   const standardMonthlyRate = isHalfDay ? 600 : 1100;
   const standard15DayRate = isHalfDay ? 400 : 600;
 
-  let seatPlanAmount = is15Days ? standard15DayRate : (standardMonthlyRate * (monthsCount || 1));
-
-  if (payment?.notes) {
-    const matchBase = payment.notes.match(/Base\s*Plan:\s*₹?\s*(\d+(?:\.\d+)?)/i);
-    if (matchBase && matchBase[1]) {
-      seatPlanAmount = parseFloat(matchBase[1]);
-    }
+  let seatPlanAmount;
+  if (explicitPlanTotal !== null) {
+    seatPlanAmount = Math.max(0, explicitPlanTotal - lockerFee);
+  } else if (member?.plan_amount && parseFloat(member.plan_amount) > 0 && parseFloat(member.plan_amount) !== standardMonthlyRate) {
+    seatPlanAmount = Math.max(0, parseFloat(member.plan_amount) - lockerFee);
+  } else if (is15Days) {
+    seatPlanAmount = standard15DayRate;
+  } else if (monthsCount && monthsCount > 0) {
+    seatPlanAmount = monthsCount >= 1 ? (standardMonthlyRate * monthsCount) : Math.round(standardMonthlyRate * monthsCount);
+  } else {
+    seatPlanAmount = standardMonthlyRate;
   }
 
   // Total Subscription Plan Fee
-  const planAmount = seatPlanAmount + lockerFee;
+  const planAmount = explicitPlanTotal !== null ? explicitPlanTotal : (seatPlanAmount + lockerFee);
 
   // Scheme detection
   const isNotesPayLater = payment?.payment_mode === "Deferred" || (payment?.notes && /pay\s*later|deferred/i.test(payment.notes));
@@ -400,9 +357,9 @@ function InvoicePrintContent() {
   // Direct Online Invoice URL link for WhatsApp sharing
   const getInvoiceDirectUrl = () => {
     if (typeof window !== "undefined") {
-      return `${window.location.origin}/invoice?id=${receiptNo}`;
+      return `${window.location.origin}/invoice?id=${encodeURIComponent(payment.id)}&token=${encodeURIComponent(shareToken)}`;
     }
-    return `http://localhost:3000/invoice?id=${receiptNo}`;
+    return "";
   };
 
   // WhatsApp Share Handlers
@@ -482,7 +439,7 @@ function InvoicePrintContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0F172A] text-slate-900 font-sans p-2.5 sm:p-6 md:p-10 flex flex-col items-center selection:bg-slate-900 selection:text-white relative overflow-x-hidden">
+    <div suppressHydrationWarning className="min-h-screen bg-[#0F172A] text-slate-900 font-sans p-2.5 sm:p-6 md:p-10 flex flex-col items-center selection:bg-slate-900 selection:text-white relative overflow-x-hidden">
       {/* Floating Copy Toast Notification */}
       {copyToast && (
         <div className="fixed top-5 z-50 bg-emerald-600 text-white font-extrabold text-xs px-5 py-3 rounded-2xl shadow-2xl border border-emerald-400 animate-bounce flex items-center gap-2 max-w-[90vw] text-center">
@@ -574,7 +531,7 @@ function InvoicePrintContent() {
       </div>
 
       {/* 2. Official A4 Size Fee Receipt Card */}
-      <div id="a4-invoice-printable" className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-[840px] p-4 sm:p-8 md:p-12 space-y-6 sm:space-y-8 print:p-8 print:shadow-none print:w-full overflow-hidden">
+      <div suppressHydrationWarning id="a4-invoice-printable" className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-[840px] p-4 sm:p-8 md:p-12 space-y-6 sm:space-y-8 print:p-8 print:shadow-none print:w-full overflow-hidden">
         
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row items-start justify-between gap-4 sm:gap-6 pb-5 sm:pb-6 border-b border-slate-200">
@@ -870,7 +827,7 @@ function InvoicePrintContent() {
 export default function InvoicePrintPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#0F172A] text-slate-200 flex items-center justify-center">
+      <div suppressHydrationWarning className="min-h-screen bg-[#0F172A] text-slate-200 flex items-center justify-center">
         <div className="flex items-center gap-3 bg-slate-800/80 px-6 py-4 rounded-xl border border-slate-700">
           <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-sm font-medium">Loading Invoice...</span>

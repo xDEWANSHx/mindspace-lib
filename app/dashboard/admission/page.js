@@ -148,6 +148,7 @@ export default function NewAdmissionPage() {
 
   const handleExpressSubmit = async (e) => {
     e.preventDefault();
+    try {
     if (!expressForm.full_name || !expressForm.mobile) {
       alert("Please enter Student Full Name and Mobile Phone Number.");
       return;
@@ -315,6 +316,7 @@ export default function NewAdmissionPage() {
     }));
 
     setTimeout(() => setExpressSuccessMsg(""), 6000);
+    } catch (error) { alert('Admission incomplete: ' + error.message + ' Check the member and receipts before retrying.'); }
   };
 
   // Auto-fill from Enquiry URL query params

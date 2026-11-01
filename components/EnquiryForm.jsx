@@ -34,8 +34,6 @@ function Field({ label, icon: Icon, children }) {
 
 const inputCls = "w-full bg-[#F5F3EF] border border-[#e0ddd8] rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-[#00A8CC] focus:border-transparent outline-none font-body text-sm text-[#1C2421] placeholder:text-[#b0ada8] transition-all duration-200";
 
-import { supabase } from "@/lib/supabase";
-import { generateUUID } from "@/lib/adminService";
 
 export default function EnquiryForm() {
   const [form, setForm] = useState({
@@ -43,37 +41,22 @@ export default function EnquiryForm() {
     purpose: "", source: "", message: "",
   });
   const [status, setStatus] = useState("idle");
+  const [error, setError] = useState("");
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.mobile) return;
-    setStatus("submitting");
-
-    const newLead = {
-      id: generateUUID(),
-      full_name: form.name,
-      phone: form.mobile,
-      interest: form.shift || "Full Day",
-      status: "new",
-      branch: "main_branch",
-      notes: `Email: ${form.email || 'N/A'} | Exam: ${form.purpose || 'General'} | Source: ${form.source || 'Website'} | Note: ${form.message || 'N/A'}`,
-      created_at: new Date().toISOString()
-    };
-
-    // Direct insert to Supabase leads table (0% cache dependency)
+    if (!form.name || !form.mobile || status === 'submitting') return;
+    setStatus('submitting'); setError('');
     try {
-      await supabase.from('leads').insert([newLead]);
-    } catch (err) {
-      console.error("Supabase lead insert error:", err);
-    }
-
-    setTimeout(() => {
-      setStatus("success");
-      setForm({ name: "", mobile: "", email: "", shift: SHIFTS[2].value, purpose: "", source: "", message: "" });
-      setTimeout(() => setStatus("idle"), 5000);
-    }, 1000);
+      const response = await fetch('/api/enquiries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Enquiry could not be saved.');
+      setStatus('success');
+      setForm({ name: '', mobile: '', email: '', shift: SHIFTS[2].value, purpose: '', source: '', message: '' });
+      setTimeout(() => setStatus('idle'), 5000);
+    } catch (error) { setError(error.message); setStatus('idle'); }
   };
 
   return (
@@ -167,6 +150,7 @@ export default function EnquiryForm() {
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
+                  {error && <div role="alert" className="text-red-700 text-sm">{error}</div>}
                   <div>
                     <h3 className="font-headline-md text-xl text-[#1C2421] mb-1">Your Details</h3>
                     <p className="font-body text-xs text-[#767872]">Fill in your information — we&apos;ll handle the rest.</p>

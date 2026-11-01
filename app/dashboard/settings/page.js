@@ -114,8 +114,8 @@ export default function SettingsPage() {
         setDeepWorkDesc(loaded.deepWorkDesc || DEFAULT_SYSTEM_SETTINGS.deepWorkDesc);
 
         setGalleryImages(loaded.galleryImages || DEFAULT_SYSTEM_SETTINGS.galleryImages);
-        setAdminPassword(loaded.adminPassword || "Harsh@44");
-        setStaffPassword(loaded.staffPassword || "Staff.01");
+        setAdminPassword("");
+        setStaffPassword("");
       }
     }
     loadAllSettings();
@@ -196,7 +196,7 @@ export default function SettingsPage() {
     if (res && res.success) {
       alert("✨ Success! Founder photo, notes, hero image & gallery photos saved & synced LIVE to Supabase Cloud for all visitors worldwide!");
     } else {
-      alert(`⚠️ Cloud Sync Notice:\nSaved in local browser cache, but Cloud Database Sync failed.\n\nReason: ${res?.error || 'site_settings table missing'}\n\nPlease run the SUPABASE_SCHEMA.sql script in your Supabase SQL Editor so changes update globally for everyone!`);
+      alert(`⚠️ Cloud Sync Notice:\nSettings were not saved.\n\nReason: ${res?.error || 'Connection failed'}\n\nYour existing settings have been preserved.`);
     }
   };
 
@@ -221,17 +221,12 @@ export default function SettingsPage() {
     setGalleryImages(updated);
   };
 
-  const handleSavePasswords = (e) => {
+  const handleSavePasswords = async (e) => {
     e.preventDefault();
-    const curr = getSystemSettings();
-    const updated = {
-      ...curr,
-      adminPassword,
-      staffPassword
-    };
-    saveSystemSettings(updated, 'Admin');
-    setPassSaveMsg("Security passwords updated successfully!");
-    setTimeout(() => setPassSaveMsg(""), 3000);
+    if (!adminPassword && !staffPassword) { setPassSaveMsg('Enter a new password first.'); return; }
+    const result = await saveSystemSettings({ adminPassword, staffPassword });
+    setPassSaveMsg(result.success ? 'Passwords updated successfully.' : result.error);
+    if (result.success) { setAdminPassword(''); setStaffPassword(''); }
   };
 
   const handleSaveWATemplates = async (e) => {

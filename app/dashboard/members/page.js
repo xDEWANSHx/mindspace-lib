@@ -1,4 +1,5 @@
 "use client";
+import { paymentBelongsToMember } from "@/lib/memberIdentity";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -238,7 +239,7 @@ export default function MembersDirectoryPage() {
       p.member_id === m.id ||
       p.member_id === m.permanent_id ||
       p.member_id === m.student_no ||
-      (p.member_name && m.full_name && p.member_name.trim().toLowerCase() === m.full_name.trim().toLowerCase())
+      paymentBelongsToMember(p, m)
     );
   };
 
@@ -365,13 +366,11 @@ export default function MembersDirectoryPage() {
       if (editData.full_name && editData.full_name !== selectedMember.full_name) {
         await supabase.from('payments').update({
           member_name: editData.full_name
-        }).or(`member_id.eq.${selectedMember.id},member_name.ilike.${selectedMember.full_name}`);
+        }).eq('member_id', selectedMember.id);
       }
 
       const memPayments = payments.filter(p =>
-        p.member_id === selectedMember.id ||
-        p.member_id === selectedMember.permanent_id ||
-        (p.member_name && selectedMember.full_name && p.member_name.trim().toLowerCase() === selectedMember.full_name.trim().toLowerCase())
+        paymentBelongsToMember(p, selectedMember)
       );
       if (memPayments.length > 0 && (editData.sub_start_date || editData.subscription_end_date)) {
         memPayments.sort((a, b) => {
@@ -783,7 +782,7 @@ export default function MembersDirectoryPage() {
                 p.member_id === m.id ||
                 p.member_id === m.permanent_id ||
                 p.member_id === m.student_no ||
-                (p.member_name && m.full_name && p.member_name.trim().toLowerCase() === m.full_name.trim().toLowerCase())
+                paymentBelongsToMember(p, m)
               );
               const isHalf = m.shift === 'Morning' || m.shift === 'Evening';
               const baseFee = isHalf ? 600 : 1100;
@@ -870,7 +869,7 @@ export default function MembersDirectoryPage() {
                       p.member_id === m.id ||
                       p.member_id === m.permanent_id ||
                       p.member_id === m.student_no ||
-                      (p.member_name && m.full_name && p.member_name.trim().toLowerCase() === m.full_name.trim().toLowerCase())
+                      paymentBelongsToMember(p, m)
                     );
                     const isHalf = m.shift === 'Morning' || m.shift === 'Evening';
                     const baseFee = isHalf ? 600 : 1100;
@@ -1667,9 +1666,9 @@ export default function MembersDirectoryPage() {
               </div>
 
               <div className="max-h-80 overflow-y-auto space-y-2.5 custom-scrollbar pr-1">
-                {payments.filter(p => p.member_id === historyMember.id || (p.member_name && p.member_name.toLowerCase() === historyMember.full_name.toLowerCase())).length > 0 ? (
+                {payments.filter(p => paymentBelongsToMember(p, historyMember)).length > 0 ? (
                   payments
-                    .filter(p => p.member_id === historyMember.id || (p.member_name && p.member_name.toLowerCase() === historyMember.full_name.toLowerCase()))
+                    .filter(p => paymentBelongsToMember(p, historyMember))
                     .map((p) => (
                       <div key={p.id} className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 flex items-center justify-between gap-3 text-xs">
                         <div>

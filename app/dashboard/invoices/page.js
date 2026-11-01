@@ -132,10 +132,6 @@ export default function InvoicesLedgerPage() {
     }
 
     let foundMem = (mList || []).find(m => m.id === p.member_id || m.permanent_id === p.member_id || m.student_no === p.member_id);
-    if (!foundMem && p.member_name) {
-      const pName = p.member_name.trim().toLowerCase();
-      foundMem = (mList || []).find(m => m.full_name && m.full_name.trim().toLowerCase() === pName);
-    }
     if (!foundMem && p.member_id) {
       try {
         const { data: dbMem } = await supabase.from('members').select('*').eq('id', p.member_id).single();

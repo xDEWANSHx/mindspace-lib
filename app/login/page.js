@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, Shield, User, ArrowLeft, Loader2, Sparkles, AlertTriangle } from "lucide-react";
 import Image from "next/image";
-import { getSystemSettings } from "@/lib/adminService";
+
 
 export default function Login() {
   const router = useRouter();
@@ -13,36 +13,20 @@ export default function Login() {
   const [loadingRole, setLoadingRole] = useState(null); // 'admin' | 'staff' | 'form'
   const [loginError, setLoginError] = useState("");
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
-    if (!username || !password) return;
-
-    setLoadingRole("form");
-    setLoginError("");
-
-    setTimeout(() => {
-      const settings = getSystemSettings();
-      const adminUser = (settings.adminUsername || "mindspace-01").trim();
-      const adminPass = (settings.adminPassword || "Harsh@44").trim();
-      const staffUser = (settings.staffUsername || "staff-01").trim();
-      const staffPass = (settings.staffPassword || "Staff.01").trim();
-
-      const u = username.trim();
-      const p = password.trim();
-
-      if (u === adminUser && p === adminPass) {
-        localStorage.setItem("mindspace_user_role", "admin");
-        localStorage.setItem("mindspace_user_name", "Harsh Goyal (Admin)");
-        router.push("/dashboard");
-      } else if (u === staffUser && p === staffPass) {
-        localStorage.setItem("mindspace_user_role", "staff");
-        localStorage.setItem("mindspace_user_name", "Staff");
-        router.push("/dashboard");
-      } else {
-        setLoadingRole(null);
-        setLoginError(`Invalid Username or Access Passcode!`);
-      }
-    }, 600);
+    if (!username || !password || loadingRole) return;
+    setLoadingRole("form"); setLoginError("");
+    try {
+      const response = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Sign-in failed.');
+      // Display cache only. Server cookie controls access.
+      localStorage.setItem('mindspace_user_role', result.role);
+      localStorage.setItem('mindspace_user_name', result.name);
+      router.push('/dashboard'); router.refresh();
+    } catch (error) { setLoginError(error.message); }
+    finally { setLoadingRole(null); }
   };
 
   return (

@@ -80,44 +80,26 @@ export default function DashboardLayout({ children, activeBranch, setActiveBranc
   };
 
   useEffect(() => {
-    const savedRole = localStorage.getItem("mindspace_user_role");
-    if (!savedRole || (savedRole !== "admin" && savedRole !== "staff")) {
-      router.push("/login");
-      return;
+    let cancelled = false;
+    let unsubscribe = () => {};
+    setIsAuthenticated(false);
+    async function authenticate() {
+      try {
+        const response = await fetch('/api/auth', { cache: 'no-store' });
+        if (!response.ok) { router.replace('/login'); return; }
+        const session = await response.json();
+        if (cancelled) return;
+        localStorage.setItem('mindspace_user_role', session.role);
+        localStorage.setItem('mindspace_user_name', session.name);
+        setUserRole(session.role); setUserName(session.name);
+        setIsAuthenticated(true);
+        await loadData();
+        if (!cancelled) unsubscribe = subscribeToCloudChanges(loadData);
+      } catch { if (!cancelled) router.replace('/login'); }
     }
-
-    if (savedRole === "staff") {
-      const restrictedPaths = [
-        "/dashboard/analytics",
-        "/dashboard/expenses",
-        "/dashboard/settings",
-        "/dashboard/activities",
-        "/dashboard/loss-payment"
-      ];
-      if (restrictedPaths.includes(pathname)) {
-        router.push("/dashboard");
-        return;
-      }
-    }
-
-    setIsAuthenticated(true);
-
-    loadData();
-
-    // Subscribe to realtime cloud updates across devices!
-    const unsubscribe = subscribeToCloudChanges(() => {
-      loadData();
-    });
-
-    return () => {
-      unsubscribe();
-    };
+    authenticate();
+    return () => { cancelled = true; unsubscribe(); };
   }, [activeBranch, router, pathname]);
-
-  const handleRoleToggle = (newRole) => {
-    setUserRole(newRole);
-    localStorage.setItem("mindspace_user_role", newRole);
-  };
 
   const navGroups = [
     {
@@ -148,26 +130,20 @@ export default function DashboardLayout({ children, activeBranch, setActiveBranc
     }
   ];
 
-  const handleLogout = () => {
-    localStorage.removeItem("mindspace_user_role");
-    localStorage.removeItem("mindspace_user_name");
-    router.push("/login");
+  const handleLogout = async () => {
+    const response = await fetch('/api/auth', { method: 'DELETE' });
+    if (!response.ok) { alert('Sign out failed. Please retry.'); return; }
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('mindspace_')) localStorage.removeItem(key);
+    }
+    router.replace('/login'); router.refresh();
   };
 
-  const monthsOptions = [
-    { value: "ALL", label: "All Time (Total History)" },
-    { value: "2026-08", label: "August 2026" },
-    { value: "2026-07", label: "July 2026" },
-    { value: "2026-06", label: "June 2026" },
-    { value: "2026-05", label: "May 2026" },
-    { value: "2026-04", label: "April 2026" },
-    { value: "2026-03", label: "March 2026" },
-    { value: "2026-02", label: "February 2026" },
-    { value: "2026-01", label: "January 2026" },
-    { value: "2025-12", label: "December 2025" },
-    { value: "2025-11", label: "November 2025" },
-    { value: "2025-10", label: "October 2025" },
-  ];
+  const monthsOptions = [{ value: 'ALL', label: 'All Time (Total History)' }, ...Array.from({ length: 24 }, (_, index) => {
+    const date = new Date(); date.setDate(1); date.setMonth(date.getMonth() - index);
+    return { value: date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0'), label: date.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) };
+  })];
 
   const allNavItems = navGroups.flatMap(g => g.items);
   const currentNav = allNavItems.find(i => i.href === pathname) || { label: "Overview" };
@@ -360,7 +336,7 @@ export default function DashboardLayout({ children, activeBranch, setActiveBranc
             {/* Live Sync Badge */}
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-700 font-bold shadow-2xs">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Live Cloud Sync</span>
+              <span>Cloud refresh: 10s</span>
             </div>
           </div>
         </header>
