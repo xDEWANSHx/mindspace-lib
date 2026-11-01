@@ -18,8 +18,8 @@ export async function handle(request, context) {
   const select = url.searchParams.get('select');
   if (select && !/^(\*|[a-z_]+(?:,[a-z_]+)*)$/i.test(select)) return Response.json({ message: 'Unsupported projection.' }, { status: 400 });
   try {
-    const base = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const base = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://bzdmuuuslrqlivjqbiwj.supabase.co';
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ6ZG11dXVzbHJxbGl2anFiaXdqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NTQyNTE5MywiZXhwIjoyMTAxMDAxMTkzfQ.G6eHJfQ8u7z2KfxQgI7DqL97dNzOxFYlYOLrgQ3l5q8';
     if (!base || !key) throw new Error('Missing configuration');
     const headers = new Headers({ apikey: key, Authorization: `Bearer ${key}` });
     for (const name of ['content-type', 'accept', 'prefer', 'range', 'range-unit', 'x-upsert', 'cache-control']) {

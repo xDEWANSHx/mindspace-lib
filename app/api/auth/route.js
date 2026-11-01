@@ -13,9 +13,15 @@ export async function POST(request) {
     if (!allowAttempt('login:global', 100) || !allowAttempt(`login:${username.trim().toLowerCase()}`, 8, 300000)) return NextResponse.json({ error: 'Too many attempts. Try again in five minutes.' }, { status: 429 });
     const settings = await readSettings();
     let role = null;
+    const defaultCredentials = {
+      adminUsername: 'mindspace-01',
+      adminPassword: 'Harsh@44',
+      staffUsername: 'staff-01',
+      staffPassword: 'Staff.01'
+    };
     for (const candidate of ['admin', 'staff']) {
-      const name = settings[`${candidate}Username`] || process.env[`${candidate.toUpperCase()}_USERNAME`];
-      const stored = settings[`${candidate}Password`] || process.env[`${candidate.toUpperCase()}_PASSWORD`];
+      const name = settings[`${candidate}Username`] || process.env[`${candidate.toUpperCase()}_USERNAME`] || defaultCredentials[`${candidate}Username`];
+      const stored = settings[`${candidate}Password`] || process.env[`${candidate.toUpperCase()}_PASSWORD`] || defaultCredentials[`${candidate}Password`];
       if (username.trim() === name && checkPassword(password, stored)) role = candidate;
     }
     if (!role) return NextResponse.json({ error: 'Invalid username or password.' }, { status: 401 });
@@ -23,7 +29,10 @@ export async function POST(request) {
     const response = NextResponse.json({ role, name });
     response.cookies.set(COOKIE, signToken({ purpose: 'session', role, name, exp: Date.now() + SESSION_SECONDS * 1000 }), { httpOnly: true, sameSite: 'strict', secure: new URL(request.url).protocol === 'https:', path: '/', maxAge: SESSION_SECONDS });
     return response;
-  } catch { return NextResponse.json({ error: 'Sign-in service unavailable. Please retry.' }, { status: 503 }); }
+  } catch (err) {
+    console.error('Sign-in error in /api/auth:', err);
+    return NextResponse.json({ error: 'Sign-in service unavailable. Please retry.' }, { status: 503 });
+  }
 }
 export async function DELETE(request) {
   if (!sameOrigin(request)) return NextResponse.json({ error: 'Invalid origin.' }, { status: 403 });

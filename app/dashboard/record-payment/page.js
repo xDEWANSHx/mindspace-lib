@@ -158,7 +158,7 @@ function RecordPaymentContent() {
   useEffect(() => {
     const fee = parseFloat(lockerFee || 50);
     const isHalfDay = selectedMemberObj?.shift === "Morning" || selectedMemberObj?.shift === "Evening";
-    
+
     // Exact standard shift rates: Full Day (1100 / 600) | Half Day (600 / 400)
     const baseShiftMonthly = (selectedMemberObj?.plan_amount && selectedMemberObj.plan_amount !== 1100 && selectedMemberObj.plan_amount !== 600 && selectedMemberObj.plan_amount !== 1150 && selectedMemberObj.plan_amount !== 650 && selectedMemberObj.plan_amount !== 1200)
       ? (selectedMemberObj.has_locker ? Math.max(0, selectedMemberObj.plan_amount - 50) : selectedMemberObj.plan_amount)
@@ -214,51 +214,51 @@ function RecordPaymentContent() {
     async function load() {
       setHistoryReady(false); setHistoryError("");
       try {
-      const [mList, pList] = await Promise.all([
-        fetchMembers(activeBranch),
-        fetchPayments(activeBranch, { strict: true })
-      ]);
-      if (cancelled) return;
-      setHistoryReady(true);
-      setMembers(mList);
-      setPayments(pList);
+        const [mList, pList] = await Promise.all([
+          fetchMembers(activeBranch),
+          fetchPayments(activeBranch, { strict: true })
+        ]);
+        if (cancelled) return;
+        setHistoryReady(true);
+        setMembers(mList);
+        setPayments(pList);
 
-      if (queryMemberId && mList.some(m => m.id === queryMemberId)) {
-        setSelectedMemberId(queryMemberId);
-        const m = mList.find(x => x.id === queryMemberId);
-        if (m) {
-          const ctx = paymentContext(m, pList);
-          if (ctx.canCollect) {
+        if (queryMemberId && mList.some(m => m.id === queryMemberId)) {
+          setSelectedMemberId(queryMemberId);
+          const m = mList.find(x => x.id === queryMemberId);
+          if (m) {
+            const ctx = paymentContext(m, pList);
+            if (ctx.canCollect) {
+              setPaymentType("COLLECT_DUES");
+              setAmountPaidToday(m.outstanding_dues);
+            } else {
+              setPaymentType("FULL");
+              setPlanFee(m.plan_amount || 1100);
+              setAmountPaidToday(m.plan_amount || 1100);
+            }
+          }
+        } else if (mList.length > 0) {
+          // Sort mList by newest first so newly admitted student is selected by default
+          const sortedList = [...mList].sort((a, b) => {
+            const timeA = new Date(a.created_at || a.joining_date || 0).getTime();
+            const timeB = new Date(b.created_at || b.joining_date || 0).getTime();
+            if (timeA !== timeB) return timeB - timeA;
+            const idA = parseInt(String(a.permanent_id || '').replace(/\D/g, '')) || 0;
+            const idB = parseInt(String(b.permanent_id || '').replace(/\D/g, '')) || 0;
+            return idB - idA;
+          });
+          const topMem = sortedList[0];
+          setSelectedMemberId(topMem.id);
+          const topCtx = paymentContext(topMem, pList);
+          if (topCtx.canCollect) {
             setPaymentType("COLLECT_DUES");
-            setAmountPaidToday(m.outstanding_dues);
+            setAmountPaidToday(topMem.outstanding_dues);
           } else {
             setPaymentType("FULL");
-            setPlanFee(m.plan_amount || 1100);
-            setAmountPaidToday(m.plan_amount || 1100);
+            setPlanFee(topMem.plan_amount || 1100);
+            setAmountPaidToday(topMem.plan_amount || 1100);
           }
         }
-      } else if (mList.length > 0) {
-        // Sort mList by newest first so newly admitted student is selected by default
-        const sortedList = [...mList].sort((a, b) => {
-          const timeA = new Date(a.created_at || a.joining_date || 0).getTime();
-          const timeB = new Date(b.created_at || b.joining_date || 0).getTime();
-          if (timeA !== timeB) return timeB - timeA;
-          const idA = parseInt(String(a.permanent_id || '').replace(/\D/g, '')) || 0;
-          const idB = parseInt(String(b.permanent_id || '').replace(/\D/g, '')) || 0;
-          return idB - idA;
-        });
-        const topMem = sortedList[0];
-        setSelectedMemberId(topMem.id);
-        const topCtx = paymentContext(topMem, pList);
-        if (topCtx.canCollect) {
-          setPaymentType("COLLECT_DUES");
-          setAmountPaidToday(topMem.outstanding_dues);
-        } else {
-          setPaymentType("FULL");
-          setPlanFee(topMem.plan_amount || 1100);
-          setAmountPaidToday(topMem.plan_amount || 1100);
-        }
-      }
       } catch (error) { if (!cancelled) setHistoryError(error.message || "Payment history could not be loaded. Refresh before recording a payment."); }
     }
     load();
@@ -373,47 +373,47 @@ function RecordPaymentContent() {
     paymentBusy.current = true;
     try {
 
-    const p = await recordPayment({
-      member_id: selectedMemberObj.id,
-      member_name: selectedMemberObj.full_name,
-      amount: payload.parsedPaidToday,
-      branch: activeBranch,
-      payment_mode: payload.parsedPaidToday === 0 ? "Deferred" : payload.paymentMode,
-      cash_amount: payload.cPart,
-      online_amount: payload.oPart,
-      notes: payload.finalNote + payload.lockerNoteTag,
-      is_renewal: payload.isRenewalAction,
-      extend_days: payload.extendDays,
-      start_date: payload.joiningDate,
-      end_date: payload.finalExpiryDate || addOneMonth(payload.joiningDate),
-      new_outstanding_dues: payload.calculatedNewDues,
-      dues_due_date: payload.calculatedNewDues > 0 ? payload.promisedDueDate : null,
-      has_locker: payload.paymentType === 'COLLECT_DUES' ? null : payload.includeLocker,
-      payment_type: payload.paymentType,
-      paid_at: payload.paidDate,
-      plan_amount: payload.planAmount
-    });
+      const p = await recordPayment({
+        member_id: selectedMemberObj.id,
+        member_name: selectedMemberObj.full_name,
+        amount: payload.parsedPaidToday,
+        branch: activeBranch,
+        payment_mode: payload.parsedPaidToday === 0 ? "Deferred" : payload.paymentMode,
+        cash_amount: payload.cPart,
+        online_amount: payload.oPart,
+        notes: payload.finalNote + payload.lockerNoteTag,
+        is_renewal: payload.isRenewalAction,
+        extend_days: payload.extendDays,
+        start_date: payload.joiningDate,
+        end_date: payload.finalExpiryDate || addOneMonth(payload.joiningDate),
+        new_outstanding_dues: payload.calculatedNewDues,
+        dues_due_date: payload.calculatedNewDues > 0 ? payload.promisedDueDate : null,
+        has_locker: payload.paymentType === 'COLLECT_DUES' ? null : payload.includeLocker,
+        payment_type: payload.paymentType,
+        paid_at: payload.paidDate,
+        plan_amount: payload.planAmount
+      });
 
-    setSuccessPayment(p);
-    if (p.warning) alert(p.warning);
-    
-    // Reset input fields & switch payment scheme back to FULL if dues fully cleared
-    setNotes("");
-    setDiscountAmount(0);
-    setIncludeLocker(false);
-    if (payload.calculatedNewDues === 0) {
-      setPaymentType("FULL");
-    }
+      setSuccessPayment(p);
+      if (p.warning) alert(p.warning);
 
-    // Refresh live members and payments directly from database
-    const [mList, pList] = await Promise.all([
-      fetchMembers(activeBranch),
-      fetchPayments(activeBranch)
-    ]);
-    setMembers(mList);
-    setPayments(pList);
-    setActiveConfirmModalOpen(false);
-    setPendingPaymentPayload(null);
+      // Reset input fields & switch payment scheme back to FULL if dues fully cleared
+      setNotes("");
+      setDiscountAmount(0);
+      setIncludeLocker(false);
+      if (payload.calculatedNewDues === 0) {
+        setPaymentType("FULL");
+      }
+
+      // Refresh live members and payments directly from database
+      const [mList, pList] = await Promise.all([
+        fetchMembers(activeBranch),
+        fetchPayments(activeBranch)
+      ]);
+      setMembers(mList);
+      setPayments(pList);
+      setActiveConfirmModalOpen(false);
+      setPendingPaymentPayload(null);
     } catch (error) { alert(error.message || 'Payment was not saved.'); }
     finally { paymentBusy.current = false; }
   };
@@ -482,16 +482,16 @@ function RecordPaymentContent() {
     const planDurationLabel = durationTab === "15D"
       ? "15 Days"
       : durationTab === "1M"
-      ? "1 Month"
-      : durationTab === "2M"
-      ? "2 Months"
-      : durationTab === "3M"
-      ? "3 Months"
-      : durationTab === "6M"
-      ? "6 Months"
-      : durationTab === "12M"
-      ? "12 Months"
-      : (durationTab === "CUSTOM" ? `${extendDays} Days` : `${extendDays} days`);
+        ? "1 Month"
+        : durationTab === "2M"
+          ? "2 Months"
+          : durationTab === "3M"
+            ? "3 Months"
+            : durationTab === "6M"
+              ? "6 Months"
+              : durationTab === "12M"
+                ? "12 Months"
+                : (durationTab === "CUSTOM" ? `${extendDays} Days` : `${extendDays} days`);
 
     if (paymentType === "FULL") {
       defaultNote = `Full Subscription Payment (${planDurationLabel}, Paid ₹${parsedPaidToday} of ₹${effectivePayable}, ₹0 Remaining Dues)`;
@@ -607,7 +607,7 @@ function RecordPaymentContent() {
       const dates = getMemberSubscriptionDates(target, payments);
       const subStartVal = dates.subStart !== "--" ? dates.subStart : "";
       const subExpiryVal = (target.subscription_end_date && !String(target.subscription_end_date).startsWith("1970")) ? target.subscription_end_date : (dates.subExpiry !== "--" ? dates.subExpiry : "");
-      
+
       const s = String(target.shift || '').toLowerCase();
       const isHalf = s.includes("morning") || s.includes("evening") || s.includes("half");
       const baseShiftPrice = isHalf ? 600 : 1100;
@@ -694,7 +694,7 @@ function RecordPaymentContent() {
           member_name: editFormData.full_name || latestP.member_name,
           notes: updatedNotes
         }).eq('id', latestP.id);
-      } catch (err) {}
+      } catch (err) { }
     }
 
     setManageStudentModalOpen(false);
@@ -883,10 +883,10 @@ function RecordPaymentContent() {
 
         {/* 2-COLUMN TOP SECTION: STUDENTS DIRECTORY (LEFT) & RECORD TRANSACTION (RIGHT) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          
+
           {/* LEFT SIDE: STUDENTS DIRECTORY & SELECTED MEMBER CARD (5 COLUMNS) */}
           <div className="lg:col-span-5 space-y-6">
-            
+
             {/* 1. Students Directory Box */}
             <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
@@ -925,11 +925,10 @@ function RecordPaymentContent() {
                     key={tab.id}
                     type="button"
                     onClick={() => setDirectoryFilter(tab.id)}
-                    className={`px-2.5 py-1 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-                      directoryFilter === tab.id
+                    className={`px-2.5 py-1 rounded-xl transition-all cursor-pointer whitespace-nowrap ${directoryFilter === tab.id
                         ? "bg-cyan-600 text-white shadow-sm"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -958,11 +957,10 @@ function RecordPaymentContent() {
                             setAmountPaidToday(m.plan_amount || 1100);
                           }
                         }}
-                        className={`p-3 rounded-2xl border text-xs cursor-pointer transition-all flex items-center justify-between ${
-                          isSelected
+                        className={`p-3 rounded-2xl border text-xs cursor-pointer transition-all flex items-center justify-between ${isSelected
                             ? "bg-cyan-50/90 border-cyan-400 shadow-sm ring-1 ring-cyan-400/50"
                             : "bg-white border-slate-200/80 hover:bg-slate-50"
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center gap-2.5">
                           <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${m.outstanding_dues > 0 || !(payments || []).some(p => paymentBelongsToMember(p, m)) ? "bg-amber-500" : "bg-emerald-500"}`} />
@@ -1070,7 +1068,7 @@ function RecordPaymentContent() {
             <form onSubmit={handleSubmit} className="space-y-5 text-xs">
               {historyError && <p role="alert" className="text-rose-700 font-bold">{historyError} Refresh before recording a payment.</p>}
               {paymentState.firstPayment && <p className="rounded-xl bg-blue-50 p-3 text-blue-800">First admission payment: choose Full, Partial or Pay Later. The admission fee is not previous-cycle dues.</p>}
-              
+
               {/* PAYMENT TYPE MODE SELECTOR: FULL / PARTIAL / PAY LATER / DUES */}
               <div className="space-y-2">
                 <label className="text-slate-500 font-bold block uppercase tracking-wider text-[10px]">PAYMENT SCHEME TYPE</label>
@@ -1089,11 +1087,10 @@ function RecordPaymentContent() {
                         type="button"
                         disabled={scheme.id === 'COLLECT_DUES' && !paymentState.canCollect}
                         onClick={() => setPaymentType(scheme.id)}
-                        className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                          isActive
+                        className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${isActive
                             ? "bg-cyan-600 text-white border-cyan-600 shadow-md shadow-cyan-600/20"
                             : `bg-slate-50 border-slate-200 text-slate-700 ${scheme.bg}`
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center justify-between w-full">
                           <IconComp className={`w-4 h-4 ${isActive ? "text-white" : "text-slate-500"}`} />
@@ -1141,11 +1138,10 @@ function RecordPaymentContent() {
                             }
                           }
                         }}
-                        className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
-                          collectMode === o.id
+                        className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${collectMode === o.id
                             ? "bg-cyan-600 text-white border-cyan-600 shadow-sm"
                             : "bg-white border-slate-200 text-slate-700 hover:bg-cyan-50"
-                        }`}
+                          }`}
                       >
                         <p className="font-extrabold text-xs">{o.label}</p>
                         <p className={`text-[9px] ${collectMode === o.id ? "text-cyan-100" : "text-slate-400"}`}>{o.desc}</p>
@@ -1250,11 +1246,10 @@ function RecordPaymentContent() {
                         type="date"
                         value={finalExpiryDate}
                         onChange={(e) => setOverrideExpiryDate(e.target.value)}
-                        className={`w-full border rounded-xl p-2.5 text-xs font-black font-mono outline-none transition-all ${
-                          overrideExpiryDate
+                        className={`w-full border rounded-xl p-2.5 text-xs font-black font-mono outline-none transition-all ${overrideExpiryDate
                             ? "bg-purple-50 border-purple-400 text-purple-950 shadow-inner"
                             : "bg-emerald-50 border-emerald-300 text-emerald-950"
-                        }`}
+                          }`}
                       />
                     </div>
                   </div>
@@ -1263,10 +1258,10 @@ function RecordPaymentContent() {
                       {overrideExpiryDate
                         ? "✏️ Custom Expiry Date Set Manually"
                         : durationTab === "15D"
-                        ? "✨ Auto-calculated (15 Days Cycle)"
-                        : durationTab === "CUSTOM"
-                        ? `✨ Auto-calculated (${extendDays} Days Custom)`
-                        : "✨ Auto-calculated (Month-to-Month Cycle)"}
+                          ? "✨ Auto-calculated (15 Days Cycle)"
+                          : durationTab === "CUSTOM"
+                            ? `✨ Auto-calculated (${extendDays} Days Custom)`
+                            : "✨ Auto-calculated (Month-to-Month Cycle)"}
                     </span>
                     <span className="font-mono text-cyan-800 font-extrabold">
                       Active Period: {joiningDate} → {finalExpiryDate}
@@ -1282,8 +1277,8 @@ function RecordPaymentContent() {
                       {durationTab === "15D"
                         ? "15 Days Plan"
                         : durationTab === "CUSTOM"
-                        ? `Custom (${extendDays} Days)`
-                        : `${extendDays} Days`}
+                          ? `Custom (${extendDays} Days)`
+                          : `${extendDays} Days`}
                     </span>
                   </div>
                   <div className="grid grid-cols-3 sm:grid-cols-7 gap-2">
@@ -1306,11 +1301,10 @@ function RecordPaymentContent() {
                             setExtendDays(tab.days);
                           }
                         }}
-                        className={`py-2.5 rounded-2xl font-black text-xs transition-all text-center cursor-pointer ${
-                          durationTab === tab.id
+                        className={`py-2.5 rounded-2xl font-black text-xs transition-all text-center cursor-pointer ${durationTab === tab.id
                             ? "bg-slate-900 text-white shadow-md scale-[1.02]"
                             : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
-                        }`}
+                          }`}
                       >
                         {tab.label}
                       </button>
@@ -1359,11 +1353,10 @@ function RecordPaymentContent() {
                                   const suggested = Math.round((monthly / 30) * d);
                                   handleCustomPlanFeeChange(suggested);
                                 }}
-                                className={`px-2 py-1.5 rounded-lg text-[10px] font-bold border cursor-pointer ${
-                                  extendDays === d
+                                className={`px-2 py-1.5 rounded-lg text-[10px] font-bold border cursor-pointer ${extendDays === d
                                     ? "bg-amber-600 text-white border-amber-600 shadow-sm"
                                     : "bg-white text-amber-900 border-amber-200 hover:bg-amber-100"
-                                }`}
+                                  }`}
                               >
                                 {d}d
                               </button>
@@ -1413,9 +1406,8 @@ function RecordPaymentContent() {
                           onChange={(e) => setDiscountAmount(e.target.value)}
                           placeholder="e.g. 100"
                           disabled={durationTab === "CUSTOM"}
-                          className={`w-full bg-white border border-cyan-300 rounded-xl p-2.5 text-xs text-slate-900 font-bold font-mono outline-none focus:border-cyan-600 ${
-                            durationTab === "CUSTOM" ? "opacity-50 cursor-not-allowed bg-slate-100" : ""
-                          }`}
+                          className={`w-full bg-white border border-cyan-300 rounded-xl p-2.5 text-xs text-slate-900 font-bold font-mono outline-none focus:border-cyan-600 ${durationTab === "CUSTOM" ? "opacity-50 cursor-not-allowed bg-slate-100" : ""
+                            }`}
                         />
                       </div>
                       <div className="text-xs font-mono font-bold text-slate-600 bg-white p-2.5 rounded-xl border border-slate-200 flex justify-between items-center">
@@ -1452,15 +1444,14 @@ function RecordPaymentContent() {
                         </span>
                       </div>
                     </div>
-                    
+
                     <button
                       type="button"
                       onClick={() => setIncludeLocker(prev => !prev)}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        includeLocker
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${includeLocker
                           ? "bg-purple-600 text-white shadow-md hover:bg-purple-700"
                           : "bg-white border border-purple-300 text-purple-800 hover:bg-purple-50"
-                      }`}
+                        }`}
                     >
                       <Lock className="w-3.5 h-3.5" />
                       <span>
@@ -1476,11 +1467,10 @@ function RecordPaymentContent() {
                       {includeLocker ? "🔒 Locker Included for this Subscription" : "🔓 No Locker facility (Discontinued)"}
                     </span>
                     {selectedMemberObj?.has_locker !== includeLocker && (
-                      <span className={`px-2 py-0.5 rounded-md border text-[9px] font-black ${
-                        includeLocker
+                      <span className={`px-2 py-0.5 rounded-md border text-[9px] font-black ${includeLocker
                           ? "bg-emerald-100 text-emerald-800 border-emerald-300"
                           : "bg-amber-100 text-amber-900 border-amber-300"
-                      }`}>
+                        }`}>
                         {includeLocker ? "+ Locker will be added on saving" : "❌ Locker will be removed on saving"}
                       </span>
                     )}
@@ -1532,11 +1522,10 @@ function RecordPaymentContent() {
                       }
                     }}
                     disabled={paymentType === "PAY_LATER" || isDuesBlocked || !historyReady}
-                    className={`w-full border rounded-2xl p-3 outline-none font-extrabold font-mono text-sm ${
-                      paymentType === "PAY_LATER" || isDuesBlocked
+                    className={`w-full border rounded-2xl p-3 outline-none font-extrabold font-mono text-sm ${paymentType === "PAY_LATER" || isDuesBlocked
                         ? "bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200"
                         : "bg-slate-50 text-slate-900 border-slate-200 focus:border-cyan-500"
-                    }`}
+                      }`}
                     required
                   />
                 </div>
@@ -1591,11 +1580,10 @@ function RecordPaymentContent() {
                         key={mode.id}
                         type="button"
                         onClick={() => setPaymentMode(mode.id)}
-                        className={`p-3 rounded-2xl border font-bold text-xs transition-all text-center cursor-pointer ${
-                          paymentMode === mode.id
+                        className={`p-3 rounded-2xl border font-bold text-xs transition-all text-center cursor-pointer ${paymentMode === mode.id
                             ? "bg-cyan-50 border-cyan-500 text-cyan-900 shadow-sm"
                             : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
-                        }`}
+                          }`}
                       >
                         {mode.label}
                       </button>
@@ -1685,8 +1673,8 @@ function RecordPaymentContent() {
                       parseFloat(amountPaidToday) === 0
                         ? `Save Pay Later Date (${promisedDueDate || 'Set date'}) for ₹${targetPayable} ${isCustomPlan ? 'Custom Plan' : 'Dues'}`
                         : (calculatedNewDues === 0
-                            ? `Collect Full ₹${amountPaidToday} (Clear 100%)`
-                            : `Collect Partial ₹${amountPaidToday} (₹${calculatedNewDues} Remaining)`)
+                          ? `Collect Full ₹${amountPaidToday} (Clear 100%)`
+                          : `Collect Partial ₹${amountPaidToday} (₹${calculatedNewDues} Remaining)`)
                     )}
                   </span>
                 </button>
