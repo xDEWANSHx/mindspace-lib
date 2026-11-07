@@ -19,7 +19,7 @@ export async function GET(request) {
     if (payment.member_id) {
       for (const column of ['id', 'permanent_id', 'student_no']) {
         if (column === 'id' && !/^[\da-f-]{36}$/i.test(payment.member_id)) continue;
-        const result = await db.from('members').select('id,permanent_id,student_no,full_name,mobile,shift,seat_no,joining_date,subscription_end_date,has_locker,locker_no,plan_amount,outstanding_dues').eq(column, payment.member_id).limit(2);
+        const result = await db.from('members').select('id,permanent_id,student_no,full_name,mobile,shift,seat_no,joining_date,subscription_end_date,has_locker,locker_no,plan_amount,outstanding_dues,due_date').eq(column, payment.member_id).limit(2);
         if (result.error) throw result.error;
         if (result.data?.length === 1) { member = result.data[0]; break; }
       }

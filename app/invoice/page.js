@@ -338,7 +338,9 @@ function InvoicePrintContent() {
   const isPartial = !isPayLater && remainingDuesAtReceipt > 0;
 
   // Promised Payment Due Date (if present)
-  const rawPromisedDate = member?.due_date || member?.dues_due_date || payment?.dues_due_date;
+  const rawPromisedDate = (member?.due_date || member?.dues_due_date || payment?.due_date || payment?.dues_due_date || "")
+    ? String(member?.due_date || member?.dues_due_date || payment?.due_date || payment?.dues_due_date).trim().substring(0, 10)
+    : null;
   const promisedDateFormatted = rawPromisedDate ? rawPromisedDate.split('-').reverse().join('/') : null;
 
   // Check if overdue
